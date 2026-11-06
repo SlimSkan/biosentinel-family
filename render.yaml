@@ -1,0 +1,20 @@
+# Render "Blueprint": tells Render how to run the live demo, straight from GitHub.
+# On render.com: New > Blueprint > pick this repository > Apply.
+services:
+  - type: web
+    name: biosentinel-family
+    runtime: python
+    plan: free                 # sleeps after 15 min without visitors; ~1 min to wake
+    region: frankfurt          # closest Render region to the UAE
+    buildCommand: pip install -r requirements.txt
+    # One process on purpose: matches, invites and cases live in this process's memory.
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    autoDeploy: true           # every push to main redeploys the demo
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      # Locks the counsellor inbox. Render creates a random value; find it under
+      # the service's Environment tab and put it on slide 11 of the deck.
+      - key: BSF_COUNSELLOR_KEY
+        generateValue: true

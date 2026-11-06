@@ -1,14 +1,3 @@
----
-title: BioSentinel Family
-emoji: 🧬
-colorFrom: green
-colorTo: yellow
-sdk: docker
-app_port: 8000
-pinned: false
-short_description: Private AR/EN guide to premarital genetic results
----
-
 # BioSentinel Family
 
 **Know together. Decide freely.** A private, Arabic–English companion that helps couples in the
@@ -20,7 +9,8 @@ Understanding and Reducing Inherited Disease Risk).
 
 ## Try the live demo
 
-**[Open the demo](https://huggingface.co/spaces/HF_USER/biosentinel-family)**. No login is needed; all people in it are fictional.
+**[Open the demo](https://biosentinel-family.onrender.com)**. No login is needed; all people in it are fictional.
+The demo sleeps when nobody uses it: the first visit can take about a minute to wake it up.
 
 1. Open the demo twice, in two browser tabs. Choose **Amina** in one and **Khalid** in the other.
 2. Read each result (switch to العربية at the top), then answer the three quick-check questions.
@@ -31,7 +21,7 @@ Understanding and Reducing Inherited Disease Risk).
 5. In Amina's step 6, create a **family invite** and open it: a relative chooses how they are
    related and sees their own chance (for example 12.5% for a first cousin).
 
-The online demo runs on a free CPU, so the AI rewriting (Gemma 4) is switched off there and the
+The online demo runs on a free server without a GPU, so the AI rewriting (Gemma 4) is switched off there and the
 reviewed texts are shown. Run it locally with Ollama to see Gemma's rewrites.
 
 ## How it works
