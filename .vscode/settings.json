@@ -1,0 +1,7 @@
+{
+  // Testing panel (flask icon): lists all tests; run one or all with a click.
+  "python.testing.pytestEnabled": true,
+  "python.testing.unittestEnabled": false,
+  "python.testing.pytestArgs": ["tests"],
+  "files.exclude": { "**/__pycache__": true, "**/.pytest_cache": true }
+}

@@ -1,0 +1,41 @@
+{
+  "_about": "Fictional demo people. No real person or real genetic data. Variants are well-known ClinVar pathogenic variants used for illustration only.",
+  "personas": {
+    "amina": {
+      "name": "Amina",
+      "sex": "F",
+      "lab": "Demo Premarital Screening Lab",
+      "variants": [
+        {"gene": "HBB", "variant": "c.20A>T (p.Glu7Val, HbS)", "classification": "Pathogenic"},
+        {"gene": "G6PD", "variant": "c.563C>T (p.Ser188Phe, Mediterranean)", "classification": "Pathogenic"},
+        {"gene": "GJB2", "variant": "c.35delG", "classification": "Pathogenic"}
+      ]
+    },
+    "khalid": {
+      "name": "Khalid",
+      "sex": "M",
+      "lab": "Demo Premarital Screening Lab",
+      "variants": [
+        {"gene": "HBB", "variant": "c.20A>T (p.Glu7Val, HbS)", "classification": "Pathogenic"},
+        {"gene": "CFTR", "variant": "c.1521_1523del (p.Phe508del)", "classification": "Pathogenic"}
+      ]
+    },
+    "sara": {
+      "name": "Sara",
+      "sex": "F",
+      "lab": "Demo Premarital Screening Lab",
+      "variants": [
+        {"gene": "PAH", "variant": "c.1222C>T (p.Arg408Trp)", "classification": "Pathogenic"},
+        {"gene": "SMN1", "variant": "Exon 7 deletion (1 copy)", "classification": "Pathogenic"}
+      ]
+    },
+    "omar": {
+      "name": "Omar",
+      "sex": "M",
+      "lab": "Demo Premarital Screening Lab",
+      "variants": [
+        {"gene": "BTD", "variant": "Fictional demo variant", "classification": "Uncertain significance"}
+      ]
+    }
+  }
+}

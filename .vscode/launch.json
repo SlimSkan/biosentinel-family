@@ -1,0 +1,46 @@
+{
+  // Run and Debug panel (Ctrl+Shift+D): pick one of these, then press F5.
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "BioSentinel Family: run app (with Gemma)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": ["app.main:app", "--port", "8010"],
+      "cwd": "${workspaceFolder}",
+      "justMyCode": true,
+      // Opens http://localhost:8010 in your browser as soon as the server is ready.
+      "serverReadyAction": {
+        "pattern": "Uvicorn running on (https?://\\S+)",
+        "uriFormat": "%s",
+        "action": "openExternally"
+      }
+    },
+    {
+      "name": "BioSentinel Family: run app (no AI, reviewed texts only)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": ["app.main:app", "--port", "8010"],
+      "cwd": "${workspaceFolder}",
+      // Points at a port where nothing listens, to see how the app behaves without Gemma.
+      "env": { "OLLAMA_URL": "http://127.0.0.1:9" },
+      "justMyCode": true,
+      "serverReadyAction": {
+        "pattern": "Uvicorn running on (https?://\\S+)",
+        "uriFormat": "%s",
+        "action": "openExternally"
+      }
+    },
+    {
+      "name": "BioSentinel Family: run all tests",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["-q"],
+      "cwd": "${workspaceFolder}",
+      "justMyCode": true
+    }
+  ]
+}

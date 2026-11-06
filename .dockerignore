@@ -1,0 +1,9 @@
+# Only app/, data/, web/ and requirements.txt are needed in the image.
+.git
+.claude
+.pytest_cache
+**/__pycache__
+tests
+docs
+deploy
+*.md

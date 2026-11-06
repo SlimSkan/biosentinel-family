@@ -1,0 +1,307 @@
+{
+  "_about": "Curated knowledge base for the prototype gene panel. Facts summarised from Orphanet (CC BY 4.0) and ClinVar (public domain). Every entry must be reviewed by a genetics professional before any real use. ORPHA codes to be re-verified on orpha.net.",
+  "version": "0.2.0",
+  "genes": {
+    "HBB": {
+      "inheritance": "AR",
+      "condition": {
+        "en": "Sickle cell disease and beta-thalassaemia",
+        "ar": "فقر الدم المنجلي وثلاسيميا بيتا"
+      },
+      "orpha": [
+        "ORPHA:232",
+        "ORPHA:848"
+      ],
+      "summary": {
+        "en": "These conditions affect haemoglobin, the protein in red blood cells that carries oxygen. Affected people can have anaemia, pain episodes or need regular blood transfusions. Treatment and care have improved a lot.",
+        "ar": "تؤثر هذه الحالات على الهيموغلوبين، وهو البروتين الموجود في كريات الدم الحمراء الذي ينقل الأكسجين. قد يعاني المصابون من فقر الدم أو نوبات ألم أو يحتاجون إلى نقل دم منتظم. وقد تحسّن العلاج والرعاية كثيراً."
+      },
+      "key_facts": [
+        {
+          "id": "blood",
+          "say": "it affects haemoglobin / red blood cells",
+          "en": [
+            "haemoglobin",
+            "hemoglobin",
+            "red blood",
+            "blood"
+          ],
+          "ar": [
+            "الهيموغلوبين",
+            "الدم"
+          ]
+        }
+      ]
+    },
+    "CFTR": {
+      "inheritance": "AR",
+      "condition": {
+        "en": "Cystic fibrosis",
+        "ar": "التليّف الكيسي"
+      },
+      "orpha": [
+        "ORPHA:586"
+      ],
+      "summary": {
+        "en": "Cystic fibrosis mainly affects the lungs and digestion, because the body makes thick mucus. Severity varies, and modern treatments can help many people.",
+        "ar": "يؤثر التليّف الكيسي بشكل رئيسي على الرئتين والهضم لأن الجسم ينتج مخاطاً كثيفاً. تختلف شدّته من شخص لآخر، ويمكن للعلاجات الحديثة أن تساعد كثيراً من المصابين."
+      },
+      "key_facts": [
+        {
+          "id": "lungs",
+          "say": "it mainly affects the lungs and digestion",
+          "en": [
+            "lung",
+            "breath"
+          ],
+          "ar": [
+            "الرئ",
+            "التنفس"
+          ]
+        }
+      ]
+    },
+    "GJB2": {
+      "inheritance": "AR",
+      "condition": {
+        "en": "Non-syndromic hearing loss (DFNB1)",
+        "ar": "فقدان السمع غير المتلازمي (DFNB1)"
+      },
+      "orpha": [
+        "ORPHA:90636"
+      ],
+      "summary": {
+        "en": "This condition causes hearing loss from birth, without other health problems. Early hearing support, such as hearing aids or cochlear implants, helps children develop language.",
+        "ar": "تسبّب هذه الحالة فقدان السمع منذ الولادة دون مشكلات صحية أخرى. يساعد الدعم السمعي المبكر، مثل السماعات أو زراعة القوقعة، الأطفال على تطوير اللغة."
+      },
+      "key_facts": [
+        {
+          "id": "hearing",
+          "say": "it causes hearing loss from birth",
+          "en": [
+            "hear",
+            "deaf"
+          ],
+          "ar": [
+            "السمع",
+            "الصمم"
+          ]
+        }
+      ]
+    },
+    "SMN1": {
+      "inheritance": "AR",
+      "condition": {
+        "en": "Spinal muscular atrophy",
+        "ar": "ضمور العضلات الشوكي"
+      },
+      "orpha": [
+        "ORPHA:70"
+      ],
+      "summary": {
+        "en": "Spinal muscular atrophy affects the nerves that control muscles, causing weakness. Severity varies widely. New treatments work best when started early.",
+        "ar": "يؤثر ضمور العضلات الشوكي على الأعصاب التي تتحكم في العضلات فيسبّب ضعفاً فيها. تختلف شدّته كثيراً، وتكون العلاجات الحديثة أكثر فاعلية عند البدء بها مبكراً."
+      },
+      "key_facts": [
+        {
+          "id": "muscles",
+          "say": "it causes muscle weakness",
+          "en": [
+            "muscle"
+          ],
+          "ar": [
+            "عضل"
+          ]
+        },
+        {
+          "id": "early",
+          "say": "treatments work best when started early",
+          "en": [
+            "early"
+          ],
+          "ar": [
+            "مبكر"
+          ]
+        }
+      ]
+    },
+    "PAH": {
+      "inheritance": "AR",
+      "condition": {
+        "en": "Phenylketonuria (PKU)",
+        "ar": "بيلة الفينيل كيتون"
+      },
+      "orpha": [
+        "ORPHA:716"
+      ],
+      "summary": {
+        "en": "In PKU the body cannot break down an amino acid called phenylalanine. It is found by newborn screening and managed with a special diet, allowing normal development.",
+        "ar": "في بيلة الفينيل كيتون لا يستطيع الجسم تكسير حمض أميني يسمى الفينيل ألانين. تُكتشف الحالة بفحص حديثي الولادة وتُدار بنظام غذائي خاص يسمح بنمو طبيعي."
+      },
+      "key_facts": [
+        {
+          "id": "diet",
+          "say": "it is managed with a special diet",
+          "en": [
+            "diet",
+            "food"
+          ],
+          "ar": [
+            "غذائي",
+            "الغذاء",
+            "طعام"
+          ]
+        }
+      ]
+    },
+    "HEXA": {
+      "inheritance": "AR",
+      "condition": {
+        "en": "Tay-Sachs disease",
+        "ar": "داء تاي-ساكس"
+      },
+      "orpha": [
+        "ORPHA:845"
+      ],
+      "summary": {
+        "en": "Tay-Sachs disease is a serious condition that damages nerve cells in the brain and spinal cord, usually starting in infancy.",
+        "ar": "داء تاي-ساكس حالة خطيرة تُتلف الخلايا العصبية في الدماغ والحبل الشوكي، وتبدأ عادة في مرحلة الرضاعة."
+      },
+      "key_facts": [
+        {
+          "id": "nerves",
+          "say": "it damages nerve cells in the brain",
+          "en": [
+            "nerve",
+            "brain"
+          ],
+          "ar": [
+            "الاعصاب",
+            "العصبي",
+            "الدماغ"
+          ]
+        }
+      ]
+    },
+    "BTD": {
+      "inheritance": "AR",
+      "condition": {
+        "en": "Biotinidase deficiency",
+        "ar": "نقص البيوتينيداز"
+      },
+      "orpha": [
+        "ORPHA:79241"
+      ],
+      "summary": {
+        "en": "In biotinidase deficiency the body cannot recycle the vitamin biotin. It is found by newborn screening and treated with a daily biotin supplement.",
+        "ar": "في نقص البيوتينيداز لا يستطيع الجسم إعادة استخدام فيتامين البيوتين. تُكتشف الحالة بفحص حديثي الولادة وتُعالج بمكمّل يومي من البيوتين."
+      },
+      "key_facts": [
+        {
+          "id": "biotin",
+          "say": "it is treated with the vitamin biotin",
+          "en": [
+            "biotin",
+            "vitamin"
+          ],
+          "ar": [
+            "البيوتين",
+            "فيتامين"
+          ]
+        }
+      ]
+    },
+    "CYP21A2": {
+      "inheritance": "AR",
+      "condition": {
+        "en": "Congenital adrenal hyperplasia (21-hydroxylase deficiency)",
+        "ar": "تضخّم الغدة الكظرية الخلقي (نقص إنزيم 21-هيدروكسيلاز)"
+      },
+      "orpha": [
+        "ORPHA:90794"
+      ],
+      "summary": {
+        "en": "This condition affects hormone production in the adrenal glands. It is found by newborn screening and managed with hormone medicines.",
+        "ar": "تؤثر هذه الحالة على إنتاج الهرمونات في الغدد الكظرية. تُكتشف بفحص حديثي الولادة وتُدار بأدوية هرمونية."
+      },
+      "key_facts": [
+        {
+          "id": "hormones",
+          "say": "it affects hormone production and is managed with hormone medicines",
+          "en": [
+            "hormone"
+          ],
+          "ar": [
+            "هرمون"
+          ]
+        }
+      ]
+    },
+    "G6PD": {
+      "inheritance": "XL",
+      "condition": {
+        "en": "G6PD deficiency",
+        "ar": "نقص إنزيم G6PD"
+      },
+      "orpha": [
+        "ORPHA:362"
+      ],
+      "summary": {
+        "en": "G6PD deficiency makes red blood cells break down after certain triggers, such as fava beans or some medicines. Most people stay well by avoiding these triggers.",
+        "ar": "يجعل نقص إنزيم G6PD كريات الدم الحمراء تتكسّر بعد محفّزات معيّنة مثل الفول أو بعض الأدوية. يبقى معظم الأشخاص بصحة جيدة عند تجنّب هذه المحفّزات."
+      },
+      "key_facts": [
+        {
+          "id": "fava",
+          "say": "fava beans can trigger it",
+          "en": [
+            "fava",
+            "broad bean"
+          ],
+          "ar": [
+            "الفول"
+          ]
+        },
+        {
+          "id": "medicines",
+          "say": "some medicines can trigger it",
+          "en": [
+            "medicine",
+            "medication",
+            "drug"
+          ],
+          "ar": [
+            "دواء",
+            "ادوية"
+          ]
+        }
+      ]
+    },
+    "DMD": {
+      "inheritance": "XL",
+      "condition": {
+        "en": "Duchenne and Becker muscular dystrophy",
+        "ar": "الحثل العضلي من نوع دوشين وبيكر"
+      },
+      "orpha": [
+        "ORPHA:98896"
+      ],
+      "summary": {
+        "en": "These conditions cause muscle weakness that increases over time, mostly in boys. Care and new therapies continue to improve.",
+        "ar": "تسبّب هذه الحالات ضعفاً عضلياً يزداد مع الوقت، وغالباً لدى الذكور. وتستمر الرعاية والعلاجات الجديدة في التحسّن."
+      },
+      "key_facts": [
+        {
+          "id": "muscles",
+          "say": "it causes muscle weakness that increases over time",
+          "en": [
+            "muscle"
+          ],
+          "ar": [
+            "عضل"
+          ]
+        }
+      ]
+    }
+  }
+}

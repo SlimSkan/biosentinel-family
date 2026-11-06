@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BioSentinel Family · Counsellor</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header><h1>Counsellor console (guest, read-only)</h1><a href="/">Home</a></header>
+  <main>
+    <p class="small">You see only what each couple chose to send. No names or full results are stored. Refreshes every 3 seconds.</p>
+    <div id="cases"></div>
+  </main>
+  <script>
+    const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+    // On the public demo the inbox needs the counsellor key. It is kept for this tab only.
+    const key = () => { try { return sessionStorage.getItem("bsf-ckey") || ""; } catch { return ""; } };
+    async function load() {
+      const r = await fetch("/api/cases", { headers: { "X-Counsellor-Key": key() } });
+      if (r.status === 401) {
+        const k = prompt("Counsellor key");
+        if (k) { try { sessionStorage.setItem("bsf-ckey", k); } catch {} return load(); }
+        document.getElementById("cases").innerHTML = "<p>Counsellor key required.</p>"; return;
+      }
+      const cases = await r.json();
+      document.getElementById("cases").innerHTML = cases.length ? cases.map((c) => `
+        <div class="card">
+          <h3>Case ${c.id} · ${esc(c.received)} · ${esc(c.status)}</h3>
+          ${c.shared_genes.length ? `<div class="flag">Shared carrier gene(s): ${esc(c.shared_genes.join(", "))}</div>` : ""}
+          ${c.other_reasons.length ? `<div>Other reasons: ${esc(c.other_reasons.join("; "))}</div>` : ""}
+          <div class="small">Language: ${esc(c.language)} · Quick-check score: ${c.quiz_score ?? "not shared"}</div>
+          ${c.contact ? `<div>Contact: ${esc(c.contact)}</div>` : ""}
+          ${c.note ? `<div>Message: ${esc(c.note)}</div>` : ""}
+        </div>`).join("") : "<p>No cases yet.</p>";
+    }
+    load().then(() => setInterval(load, 3000));
+  </script>
+</body>
+</html>
