@@ -5,6 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>BioSentinel Family</title>
   <link rel="stylesheet" href="style.css">
+  <!-- Installable app ("Add to Home screen"): name, icons and colours -->
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#1f6f6b">
+  <link rel="icon" type="image/png" href="/icons/favicon-32.png">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="BioSentinel">
+  <script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js");</script>
 </head>
 <body>
   <header>

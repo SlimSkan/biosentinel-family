@@ -13,8 +13,10 @@ Understanding and Reducing Inherited Disease Risk).
 The demo sleeps when nobody uses it: the first visit can take about a minute to wake it up.
 
 1. Open the demo twice, in two browser tabs. Choose **Amina** in one and **Khalid** in the other.
+   On a phone, use the browser menu's **Add to Home screen** (or **Install app**) to install it with its own icon.
 2. Read each result (switch to العربية at the top), then answer the three quick-check questions.
-3. In Amina's tab, tick the consent box and **Start**; type the code in Khalid's tab and **Join**.
+3. In Amina's tab, tick the consent box and **Start**. Send the code with the WhatsApp button, or type
+   it in Khalid's tab; Khalid ticks consent and presses **Join**.
    Both see only **HBB**, the one gene they share, never each other's other results.
 4. See the risk grid and the options, then send a request to the counsellor
    (`/counsellor.html`).

@@ -25,6 +25,9 @@ const T = {
     consent: "I agree to compare privately. Only genes we BOTH carry will be shown, to both of us. Nothing else is revealed.",
     start: "Start and get a code", join: "Join with my partner's code", codePh: "Partner's code",
     shareCode: "Give this code to your partner:", waiting: "Waiting for your partner…",
+    shareCodeWa: "Send the code by WhatsApp",
+    matchMsg: (c) => `Let's compare our screening results privately in BioSentinel Family. Only a gene we both carry will be shown, nothing else. My code: ${c}`,
+    codeReceived: "Your partner sent you a code. Read the consent text, tick the box, then press Join.",
     working: "Comparing privately…", done: "Done.",
     sharedNone: "No shared genes on this panel.", sharedSome: (g) => `Shared gene(s): ${g}`,
     legend: ["Affected", "Healthy carrier", "Not a carrier"], perPregnancy: "Each pregnancy (16 dots = 16 equal chances)",
@@ -75,6 +78,9 @@ const T = {
     consent: "أوافق على المقارنة الخاصة. ستُعرض علينا نحن الاثنين فقط الجينات التي نحملها معاً، ولن يُكشف أي شيء آخر.",
     start: "ابدأ واحصل على رمز", join: "انضم برمز شريكي", codePh: "رمز الشريك",
     shareCode: "أعطِ هذا الرمز لشريكك:", waiting: "بانتظار شريكك…",
+    shareCodeWa: "أرسل الرمز عبر واتساب",
+    matchMsg: (c) => `لنقارن نتائج فحصنا بشكل خاص في BioSentinel Family. لن يظهر إلا جين نحمله كلانا، ولا شيء غير ذلك. رمزي: ${c}`,
+    codeReceived: "أرسل لك شريكك رمزاً. اقرأ نص الموافقة، وضع علامة في المربع، ثم اضغط انضم.",
     working: "تجري المقارنة الخاصة…", done: "تم.",
     sharedNone: "لا توجد جينات مشتركة ضمن هذه اللوحة.", sharedSome: (g) => `الجينات المشتركة: ${g}`,
     legend: ["مصاب", "حامل سليم", "غير حامل"], perPregnancy: "كل حمل (١٦ نقطة = ١٦ احتمالاً متساوياً)",
@@ -201,11 +207,19 @@ function renderMatch() {
       <button id="m-join" class="secondary" disabled>${t().join}</button></div>
     <div id="m-status"></div>`;
   $("consent").onchange = (e) => { $("m-start").disabled = $("m-join").disabled = !e.target.checked; };
+  // Opened from the partner's WhatsApp link: fill in the code, but consent stays a deliberate tick.
+  if (codeFromLink()) { $("m-code").value = codeFromLink(); status(`<p class="flag">${esc(t().codeReceived)}</p>`); }
   $("m-start").onclick = startMatch;
   $("m-join").onclick = () => joinMatch($("m-code").value.trim().toUpperCase());
 }
 
 const status = (html) => ($("m-status").innerHTML = html);
+
+// Demo couples. In real life the link would open the partner's own copy of the app.
+const PARTNER = { amina: "khalid", khalid: "amina", sara: "omar", omar: "sara" };
+const joinUrl = (code) => `${location.origin}/partner.html?p=${PARTNER[S.pid] || "khalid"}&code=${code}`;
+// A code that arrived in a link (?code=ABC123): letters and digits only, 6 at most.
+const codeFromLink = () => (new URLSearchParams(location.search).get("code") || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function pollUntil(code, ready) {
   for (;;) { const s = await api(`/api/match/${code}`); if (ready(s)) return s; await sleep(1500); }
@@ -216,7 +230,9 @@ async function startMatch() {
   const key = PSI.newKey();                         // secret, never sent
   const items = PSI.shuffle(pathogenicGenes());
   const { code } = await api("/api/match", {});
-  status(`<p>${t().shareCode}</p><div class="code">${code}</div><p>${t().waiting}</p>`);
+  const wa = `https://wa.me/?text=${encodeURIComponent(t().matchMsg(code) + " " + joinUrl(code))}`;
+  status(`<p>${t().shareCode}</p><div class="code">${code}</div>
+    <p><a class="btn" target="_blank" rel="noopener" href="${wa}">${t().shareCodeWa}</a></p><p>${t().waiting}</p>`);
   await api(`/api/match/${code}/a1`, { values: await PSI.lockItems(items, key) });           // H(x)^a
   const s = await pollUntil(code, (s) => s.a_double && s.b_locked);
   status(`<p>${t().working}</p>`);

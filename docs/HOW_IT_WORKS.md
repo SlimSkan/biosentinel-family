@@ -196,6 +196,17 @@ sex, which only a counsellor can work out. "I'm not sure" also gets no number.
 12.5% forced a change in `guardrails._percentages()`: it now reads decimals (`12.5%`, Arabic
 `١٢٫٥٪`, and "1 in 8").
 
+### Installable app — `web/manifest.json`, `web/sw.js`, `web/icons/`
+The app is a **progressive web app (PWA)**: a website a phone can install from the browser, with its
+own icon and full screen, without an app store.
+- `manifest.json` gives the phone the name, icons and colours. The "maskable" icons are full
+  squares with the helix in the central safe zone, because Android crops icons to circles.
+- `sw.js`, the **service worker**, is a small script the browser runs in the background. Ours is
+  **network first**: it always fetches the newest version and uses the saved copy only offline.
+  It **never saves `/api/` answers**, so no result or match is ever written to the phone's cache.
+- The match code can be sent by WhatsApp. The link fills in the code on the partner's phone, but
+  the partner must still tick consent and press Join: a link can never join a match by itself.
+
 ### `web/counsellor.html` — the counsellor inbox
 Polls `/api/cases` every 3 seconds and shows exactly what each couple chose to send.
 

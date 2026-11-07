@@ -343,3 +343,35 @@ def test_health_reports_when_the_ai_is_unreachable(monkeypatch):
     monkeypatch.setattr(explainer, "OLLAMA_URL", "http://127.0.0.1:9")    # nothing listens here
     h = TestClient(app).get("/api/health").json()
     assert h["ok"] is True and h["ai"]["reachable"] is False
+
+
+# ------------------------------------------------------------------ installable app (PWA)
+def _png_size(data: bytes) -> tuple[int, int]:
+    """Width and height from a PNG header (bytes 16-24), without an image library."""
+    assert data[:8] == b"\x89PNG\r\n\x1a\n"
+    return int.from_bytes(data[16:20], "big"), int.from_bytes(data[20:24], "big")
+
+
+def test_manifest_makes_the_app_installable():
+    c = TestClient(app)
+    m = c.get("/manifest.json").json()
+    assert m["name"] and m["start_url"] == "/" and m["display"] == "standalone"
+    sizes = {(i["sizes"], i["purpose"]) for i in m["icons"]}
+    assert {("192x192", "any"), ("512x512", "any"), ("192x192", "maskable"), ("512x512", "maskable")} <= sizes
+    for icon in m["icons"]:
+        r = c.get(icon["src"])
+        assert r.status_code == 200 and r.headers["content-type"] == "image/png"
+        w, h = _png_size(r.content)
+        assert f"{w}x{h}" == icon["sizes"], icon["src"]
+
+
+def test_service_worker_is_served_and_never_caches_the_api():
+    r = TestClient(app).get("/sw.js")
+    assert r.status_code == 200 and "javascript" in r.headers["content-type"]
+    assert 'startsWith("/api/")' in r.text          # API answers are never stored on the phone
+
+
+@pytest.mark.parametrize("page", ["index.html", "partner.html", "invite.html", "counsellor.html"])
+def test_every_page_links_the_manifest_and_registers_the_service_worker(page):
+    html = (ROOT / "web" / page).read_text(encoding="utf-8")
+    assert 'rel="manifest"' in html and 'register("/sw.js")' in html and "apple-touch-icon" in html
