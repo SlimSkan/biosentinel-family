@@ -1,3 +1,6 @@
 # Shell scripts and Dockerfiles must keep Linux line endings (LF), or bash and Docker fail.
 *.sh text eol=lf
 Dockerfile text eol=lf
+# PDFs record exact byte positions: never convert their line endings.
+*.pdf binary
+*.png binary
