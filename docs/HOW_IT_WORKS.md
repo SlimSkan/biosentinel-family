@@ -196,6 +196,26 @@ sex, which only a counsellor can work out. "I'm not sure" also gets no number.
 12.5% forced a change in `guardrails._percentages()`: it now reads decimals (`12.5%`, Arabic
 `١٢٫٥٪`, and "1 in 8").
 
+### Import a lab report — `web/report_reader.js`, `web/report_parser.js`
+The person can use their own PDF report instead of a demo person.
+1. **Read in the browser.** `report_reader.js` uses pdf.js (Mozilla's PDF reader) to get the text,
+   on the phone. The file is never uploaded, so the server still never sees a full result.
+   Text pieces are grouped by their height on the page, so a table row stays one line.
+2. **Find the results with rules, not AI.** `report_parser.js` looks, line by line, for a gene this
+   app covers plus a classification (Pathogenic, Likely pathogenic, Uncertain significance).
+   Lines like "No pathogenic variants detected in: CFTR, ..." name genes the person does NOT carry,
+   so they are listed separately and never become findings. Benign results are ignored, a gene the
+   app does not cover is shown with a "ask a counsellor" note, and a line naming two genes is skipped
+   as ambiguous. A missed or invented gene would change a couple's risk, which is why rules (testable)
+   are used instead of an AI model here.
+3. **The person confirms.** They see exactly what was read, can untick a line, must choose their sex
+   (it changes what X-linked results mean), and tick "I checked these against my paper report".
+   Only then is the report used, exactly like a lab-delivered one.
+
+Limits: text PDFs only (a photo or scanned page has no text to read; that would need OCR), and the
+rules are tuned to common report layouts. In production the lab would send a signed FHIR result
+instead, which removes both limits. `tools/make_sample_reports.py` writes the fictional sample PDFs.
+
 ### Installable app — `web/manifest.json`, `web/sw.js`, `web/icons/`
 The app is a **progressive web app (PWA)**: a website a phone can install from the browser, with its
 own icon and full screen, without an app store.

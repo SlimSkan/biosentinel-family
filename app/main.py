@@ -67,6 +67,13 @@ def get_persona(pid: str):
     return p
 
 
+@app.get("/api/panel")
+def get_panel():
+    """The genes this app covers (public). Used by the phone to read an imported report."""
+    genes = knowledge.kb()["genes"]
+    return {"genes": list(genes), "inheritance": {g: v["inheritance"] for g, v in genes.items()}}
+
+
 # ---------------------------------------------------------------- explain
 class ExplainOne(BaseModel):
     gene: str

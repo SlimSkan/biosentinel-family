@@ -1,0 +1,62 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>
+endobj
+6 0 obj
+<< /Length 1847 >>
+stream
+BT /F2 16 Tf 1 0 0 1 50 790 Tm (DEMO PREMARITAL SCREENING LAB) Tj ET
+BT /F1 10 Tf 1 0 0 1 50 770 Tm (Expanded carrier screening report - FICTIONAL DEMO, NOT A REAL PERSON) Tj ET
+BT /F1 11 Tf 1 0 0 1 50 735 Tm (Name: Sara \(demo\)) Tj ET
+BT /F1 11 Tf 1 0 0 1 250 735 Tm (Sex: Female) Tj ET
+BT /F1 11 Tf 1 0 0 1 370 735 Tm (Date of birth: 21/06/1999) Tj ET
+BT /F1 11 Tf 1 0 0 1 50 718 Tm (Report date: 05/11/2026) Tj ET
+BT /F1 11 Tf 1 0 0 1 250 718 Tm (Sample: blood) Tj ET
+BT /F1 11 Tf 1 0 0 1 370 718 Tm (Panel: 10-gene demo panel) Tj ET
+BT /F2 12 Tf 1 0 0 1 50 675 Tm (RESULTS) Tj ET
+BT /F2 10 Tf 1 0 0 1 50 653 Tm (Gene) Tj ET
+BT /F2 10 Tf 1 0 0 1 110 653 Tm (Variant) Tj ET
+BT /F2 10 Tf 1 0 0 1 330 653 Tm (Classification) Tj ET
+BT /F2 10 Tf 1 0 0 1 470 653 Tm (Status) Tj ET
+BT /F1 10 Tf 1 0 0 1 50 635 Tm (PAH) Tj ET
+BT /F1 10 Tf 1 0 0 1 110 635 Tm (c.1222C>T \(p.Arg408Trp\)) Tj ET
+BT /F1 10 Tf 1 0 0 1 330 635 Tm (Pathogenic) Tj ET
+BT /F1 10 Tf 1 0 0 1 470 635 Tm (Carrier) Tj ET
+BT /F1 10 Tf 1 0 0 1 50 617 Tm (SMN1) Tj ET
+BT /F1 10 Tf 1 0 0 1 110 617 Tm (Exon 7 deletion \(1 copy\)) Tj ET
+BT /F1 10 Tf 1 0 0 1 330 617 Tm (Pathogenic) Tj ET
+BT /F1 10 Tf 1 0 0 1 470 617 Tm (Carrier) Tj ET
+BT /F1 10 Tf 1 0 0 1 50 587 Tm (No pathogenic variants detected in: HBB, CFTR, GJB2, HEXA, BTD, CYP21A2, G6PD, DMD.) Tj ET
+BT /F2 12 Tf 1 0 0 1 50 552 Tm (INTERPRETATION) Tj ET
+BT /F1 10 Tf 1 0 0 1 50 536 Tm (Being a carrier usually has no effect on your own health.) Tj ET
+BT /F1 10 Tf 1 0 0 1 50 520 Tm (A child can be affected only if both parents carry a change in the same gene.) Tj ET
+BT /F1 10 Tf 1 0 0 1 50 504 Tm (Genetic counselling is recommended to discuss these results with your partner.) Tj ET
+BT /F1 8 Tf 1 0 0 1 50 60 Tm (This is a fictional report generated for the BioSentinel Family demo. It contains no real person's data.) Tj ET
+endstream
+endobj
+xref
+0 7
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000251 00000 n 
+0000000348 00000 n 
+0000000450 00000 n 
+trailer
+<< /Size 7 /Root 1 0 R >>
+startxref
+2349
+%%EOF

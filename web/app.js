@@ -2,6 +2,8 @@
 // Flow: 1 my result -> 2 quick check -> 3 private match -> 4 our result -> 5 counsellor
 //       6 help my family (optional, opens after the quick check)
 import { PSI } from "./psi.js";
+import { pdfToText } from "./report_reader.js";
+import { parseReportText } from "./report_parser.js";
 
 // ------------------------------------------------------------------ text (EN / AR)
 const T = {
@@ -26,6 +28,23 @@ const T = {
     start: "Start and get a code", join: "Join with my partner's code", codePh: "Partner's code",
     shareCode: "Give this code to your partner:", waiting: "Waiting for your partner…",
     shareCodeWa: "Send the code by WhatsApp",
+    impTitle: "Import my lab report",
+    impIntro: "Choose the PDF report you received from the screening lab. We read the results from it, then you check them before anything is explained.",
+    impPrivacy: "Your PDF is read on this phone. It is not uploaded or stored anywhere.",
+    impChoose: "Choose a PDF report", impReading: "Reading your report on this phone…",
+    impNoReport: "No report at hand? Try a fictional one:",
+    impCheck: "This is what we read from your report. Please check it against your paper report.",
+    impLab: "Lab", impName: "Name", impSex: "Sex", impFemale: "Female", impMale: "Male", impPickSex: "Choose…",
+    impCols: ["Use", "Gene", "Variant", "Classification"],
+    impNegative: (g) => `Listed as not carried: ${g}.`,
+    impNotCovered: (g) => `Also in your report but not covered by this app: ${g}. Please ask a genetic counsellor about these.`,
+    impNone: "We could not find any results in this file. Is it a text PDF from a lab? (Photos and scanned pages are not supported yet.)",
+    impNoFindings: "The report lists no carrier results for the genes this app covers.",
+    impConfirmBox: "I checked these results against my paper report.",
+    impNeedSex: "Choose your sex first: it changes what some results mean.",
+    impContinue: "Continue with these results", impAgain: "Choose another file",
+    impError: "This file could not be read. Is it a PDF?",
+    you: "you", yourPdf: "Your PDF report",
     matchMsg: (c) => `Let's compare our screening results privately in BioSentinel Family. Only a gene we both carry will be shown, nothing else. My code: ${c}`,
     codeReceived: "Your partner sent you a code. Read the consent text, tick the box, then press Join.",
     working: "Comparing privately…", done: "Done.",
@@ -79,6 +98,23 @@ const T = {
     start: "ابدأ واحصل على رمز", join: "انضم برمز شريكي", codePh: "رمز الشريك",
     shareCode: "أعطِ هذا الرمز لشريكك:", waiting: "بانتظار شريكك…",
     shareCodeWa: "أرسل الرمز عبر واتساب",
+    impTitle: "استيراد تقرير المختبر",
+    impIntro: "اختر تقرير PDF الذي استلمته من مختبر الفحص. نقرأ النتائج منه، ثم تتحقق منها قبل أي شرح.",
+    impPrivacy: "يُقرأ ملف PDF على هذا الهاتف فقط، ولا يُرفع ولا يُحفظ في أي مكان.",
+    impChoose: "اختر تقرير PDF", impReading: "تجري قراءة تقريرك على هذا الهاتف…",
+    impNoReport: "ليس لديك تقرير؟ جرّب تقريراً وهمياً:",
+    impCheck: "هذا ما قرأناه من تقريرك. يرجى مطابقته مع تقريرك الورقي.",
+    impLab: "المختبر", impName: "الاسم", impSex: "الجنس", impFemale: "أنثى", impMale: "ذكر", impPickSex: "اختر…",
+    impCols: ["استخدام", "الجين", "المتغيّر", "التصنيف"],
+    impNegative: (g) => `مذكورة على أنها غير محمولة: ${g}.`,
+    impNotCovered: (g) => `موجودة أيضاً في تقريرك لكن هذا التطبيق لا يغطيها: ${g}. يرجى سؤال مستشار وراثي عنها.`,
+    impNone: "لم نجد أي نتائج في هذا الملف. هل هو ملف PDF نصي من مختبر؟ (الصور والصفحات الممسوحة غير مدعومة بعد.)",
+    impNoFindings: "لا يذكر التقرير أي نتيجة حمل للجينات التي يغطيها هذا التطبيق.",
+    impConfirmBox: "تحققت من هذه النتائج مقارنة بتقريري الورقي.",
+    impNeedSex: "اختر الجنس أولاً، فهو يغيّر معنى بعض النتائج.",
+    impContinue: "المتابعة بهذه النتائج", impAgain: "اختيار ملف آخر",
+    impError: "تعذّرت قراءة هذا الملف. هل هو ملف PDF؟",
+    you: "أنت", yourPdf: "تقرير PDF الخاص بك",
     matchMsg: (c) => `لنقارن نتائج فحصنا بشكل خاص في BioSentinel Family. لن يظهر إلا جين نحمله كلانا، ولا شيء غير ذلك. رمزي: ${c}`,
     codeReceived: "أرسل لك شريكك رمزاً. اقرأ نص الموافقة، وضع علامة في المربع، ثم اضغط انضم.",
     working: "تجري المقارنة الخاصة…", done: "تم.",
@@ -216,7 +252,7 @@ function renderMatch() {
 const status = (html) => ($("m-status").innerHTML = html);
 
 // Demo couples. In real life the link would open the partner's own copy of the app.
-const PARTNER = { amina: "khalid", khalid: "amina", sara: "omar", omar: "sara" };
+const PARTNER = { amina: "khalid", khalid: "amina", sara: "omar", omar: "sara", import: "import" };
 const joinUrl = (code) => `${location.origin}/partner.html?p=${PARTNER[S.pid] || "khalid"}&code=${code}`;
 // A code that arrived in a link (?code=ABC123): letters and digits only, 6 at most.
 const codeFromLink = () => (new URLSearchParams(location.search).get("code") || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
@@ -377,8 +413,71 @@ function applyLang() {
   $("level").innerHTML = Object.entries(t().levels).map(([k, v]) => `<option value="${k}" ${k === S.level ? "selected" : ""}>${v}</option>`).join("");
 }
 
+// ------------------------------------------------------------------ 0. import my own lab report (PDF)
+// The PDF is read in the browser (report_reader.js), the findings are found by rules
+// (report_parser.js), and the person confirms them before anything else happens.
+function renderImport() {
+  $("findings").innerHTML = `<h3>${t().impTitle}</h3><p>${esc(t().impIntro)}</p>
+    <p class="small">${esc(t().impPrivacy)}</p>
+    <label class="btn">${t().impChoose}<input type="file" id="pdf" accept="application/pdf,.pdf" hidden></label>
+    <p class="small">${t().impNoReport} ${["amina", "khalid", "sara", "omar"].map((p) =>
+      `<a href="/samples/${p}_report.pdf" download>${p[0].toUpperCase() + p.slice(1)}</a>`).join(" · ")}</p>
+    <div id="import-out"></div>`;
+  $("pdf").onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    $("import-out").innerHTML = `<p>${t().impReading}</p>`;
+    try {
+      const [text, panel] = await Promise.all([pdfToText(file), api("/api/panel")]);
+      S.imported = parseReportText(text, panel.genes);
+      renderConfirm();
+    } catch (err) {
+      console.error(err);
+      $("import-out").innerHTML = `<p class="flag">${t().impError}</p>`;
+    }
+  };
+  if (S.imported) renderConfirm();
+}
+
+function renderConfirm() {
+  const r = S.imported;
+  if (!r.findings.length && !r.negative.length && !r.notCovered.length) {
+    $("import-out").innerHTML = `<p class="flag">${t().impNone}</p>`;
+    return;
+  }
+  const rows = r.findings.map((f, i) => `<tr><td><input type="checkbox" data-use="${i}" checked></td>
+    <td><strong>${esc(f.gene)}</strong></td><td>${esc(f.variant || "—")}</td><td>${esc(f.classification)}</td></tr>`).join("");
+  $("import-out").innerHTML = `<div class="card">
+    <p><strong>${esc(t().impCheck)}</strong></p>
+    <p class="small">${t().impLab}: ${esc(r.lab || "—")}${r.name ? ` · ${t().impName}: ${esc(r.name)}` : ""}</p>
+    <label>${t().impSex}: <select id="imp-sex"><option value="">${t().impPickSex}</option>
+      <option value="F" ${r.sex === "F" ? "selected" : ""}>${t().impFemale}</option>
+      <option value="M" ${r.sex === "M" ? "selected" : ""}>${t().impMale}</option></select></label>
+    ${rows ? `<table class="imp"><tr>${t().impCols.map((c) => `<th>${c}</th>`).join("")}</tr>${rows}</table>`
+           : `<p>${t().impNoFindings}</p>`}
+    ${r.negative.length ? `<p class="small">${esc(t().impNegative(r.negative.join(", ")))}</p>` : ""}
+    ${r.notCovered.length ? `<p class="flag">${esc(t().impNotCovered(r.notCovered.join(", ")))}</p>` : ""}
+    <label><input type="checkbox" id="imp-ok"> ${esc(t().impConfirmBox)}</label>
+    <div class="row"><button id="imp-go" disabled>${t().impContinue}</button>
+      <button class="secondary" id="imp-again">${t().impAgain}</button></div>
+    <div id="imp-msg"></div></div>`;
+  $("imp-ok").onchange = (e) => ($("imp-go").disabled = !e.target.checked);
+  $("imp-again").onclick = () => { S.imported = null; renderImport(); };
+  $("imp-go").onclick = async () => {
+    const sex = $("imp-sex").value;
+    if (!sex) { $("imp-msg").innerHTML = `<p class="flag">${t().impNeedSex}</p>`; return; }
+    const used = r.findings.filter((_, i) => document.querySelector(`[data-use="${i}"]`).checked);
+    // From here on the imported report is used exactly like a lab-delivered one, in page memory only.
+    S.person = { name: r.name || t().you, sex, lab: r.lab || t().yourPdf, variants: used };
+    $("title").textContent = `BioSentinel Family · ${S.person.name}`;
+    await rerenderAll();
+    unlock("s-quiz");
+  };
+}
+
 async function rerenderAll() {
   applyLang();
+  if (!S.person) { renderImport(); return; }     // still on the import screen
   await loadFindings();
   renderQuiz();
   if (!$("s-match").classList.contains("locked")) renderMatch();
@@ -392,6 +491,7 @@ $("level").onchange = (e) => { S.level = e.target.value; loadFindings(); if (S.s
 (async () => {
   // Ask the server once whether Gemma is reachable; if not, hide the rewrite buttons.
   S.ai = await api("/api/health").then((h) => h.ai.reachable).catch(() => false);
+  if (S.pid === "import") { $("title").textContent = "BioSentinel Family"; await rerenderAll(); return; }
   S.person = await api(`/api/personas/${S.pid}`);
   $("title").textContent = `BioSentinel Family · ${S.person.name}`;
   await rerenderAll();

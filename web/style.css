@@ -19,7 +19,7 @@ section.locked { opacity: .45; pointer-events: none; }
 .badge.ai { border-color: var(--acc); color: var(--acc); }
 .flag { background: var(--warn-fill); color: var(--warn); border-radius: 8px; padding: 8px 10px; margin-top: 8px; font-size: 14px; }
 button { background: var(--acc); color: #fff; border: 0; border-radius: 8px; padding: 9px 14px; cursor: pointer; font-size: 14px; }
-a.btn { display: inline-block; background: var(--acc); color: #fff; border-radius: 8px; padding: 9px 14px; font-size: 14px; text-decoration: none; }
+label.btn, a.btn { display: inline-block; background: var(--acc); color: #fff; border-radius: 8px; padding: 9px 14px; font-size: 14px; text-decoration: none; }
 a.btn.secondary, button.secondary { background: #fff; color: var(--acc); border: 1px solid var(--acc); }
 button:disabled { opacity: .5; cursor: default; }
 input[type=text] { font: inherit; padding: 8px; border: 1px solid var(--line); border-radius: 8px; width: 100%; }
@@ -39,3 +39,6 @@ label { display: block; margin: 6px 0; }
 .small { font-size: 13px; color: var(--muted); }
 [dir=rtl] body { font-family: "Segoe UI", Tahoma, "Arial", sans-serif; }
 select { font: inherit; padding: 8px; border: 1px solid var(--line); border-radius: 8px; }
+table.imp { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 14px; }
+table.imp th, table.imp td { text-align: start; padding: 6px 4px; border-bottom: 1px solid var(--line); vertical-align: top; }
+label.btn { cursor: pointer; }

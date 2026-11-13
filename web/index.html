@@ -13,7 +13,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="BioSentinel">
-  <script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js");</script>
+  <script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {}); // the app still works without it</script>
 </head>
 <body>
   <header><h1>BioSentinel Family</h1><span class="small">Know together. Decide freely.</span></header>
@@ -22,6 +22,12 @@
       <h2>Continue as guest</h2>
       <p>Choose a demo person. All data is fictional. Open two people in two browser tabs to try the private match.</p>
       <div class="persona-list" id="people"></div>
+    </section>
+    <section>
+      <h2>Use my own lab report</h2>
+      <p>Import the PDF report from your screening lab. It is read on this device and never uploaded.
+        You can also download a fictional report on the next page to try it.</p>
+      <p><a class="btn" href="partner.html?p=import">Import my lab report (PDF)</a></p>
     </section>
     <section>
       <h2>Counsellor</h2>

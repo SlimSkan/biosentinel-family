@@ -22,6 +22,9 @@ The demo sleeps when nobody uses it: the first visit can take about a minute to 
    (`/counsellor.html`).
 5. In Amina's step 6, create a **family invite** and open it: a relative chooses how they are
    related and sees their own chance (for example 12.5% for a first cousin).
+6. On the home page, choose **Import my lab report (PDF)** and use one of the fictional reports
+   offered there (or in `web/samples/`). The PDF is read on the device, never uploaded; you check the
+   results before they are used.
 
 The online demo runs on a free server without a GPU, so the AI rewriting (Gemma 4) is switched off there and the
 reviewed texts are shown. Run it locally with Ollama to see Gemma's rewrites.
@@ -34,6 +37,7 @@ reviewed texts are shown. Run it locally with Ollama to see Gemma's rewrites.
 | Rules | `app/risk_engine.py` | Every number shown (25% / 50% / 25%, relatives' chances); no AI |
 | Private match | `web/psi.js`, `app/psi_reference.py` | Private set intersection: only shared genes are revealed |
 | Language | `app/explainer.py`, `app/guardrails.py` | Gemma 4 rewrites reviewed texts; six safety checks, fallback to the reviewed text |
+| Report import | `web/report_reader.js`, `web/report_parser.js` | Reads a PDF lab report in the browser; finds results with rules; the person confirms |
 | Server | `app/main.py` | FastAPI; sees no names and no full results |
 
 The full learning guide is in [docs/HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md).

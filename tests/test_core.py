@@ -375,3 +375,71 @@ def test_service_worker_is_served_and_never_caches_the_api():
 def test_every_page_links_the_manifest_and_registers_the_service_worker(page):
     html = (ROOT / "web" / page).read_text(encoding="utf-8")
     assert 'rel="manifest"' in html and 'register("/sw.js")' in html and "apple-touch-icon" in html
+
+
+# ------------------------------------------------------------------ import a lab report (PDF)
+def _parse_reports(texts: list[str]) -> list[dict]:
+    """Run the browser's report parser (web/report_parser.js) in Node on several texts."""
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node not installed")
+    url = (ROOT / "web" / "report_parser.js").as_uri()
+    script = ("import { parseReportText } from '%s';"
+              "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{"
+              "const {texts,panel}=JSON.parse(d);"
+              "console.log(JSON.stringify(texts.map(t=>parseReportText(t,panel))));});" % url)
+    panel = list(knowledge.kb()["genes"])
+    r = subprocess.run([node, "--input-type=module", "-e", script], input=json.dumps({"texts": texts, "panel": panel}),
+                       capture_output=True, text=True, encoding="utf-8", check=True)
+    return json.loads(r.stdout)
+
+
+def _report_text(pid: str) -> str:
+    """The text pdf.js gives for a sample report: one line per row, cells joined by two spaces."""
+    p = knowledge.personas()[pid]
+    sex = "Female" if p["sex"] == "F" else "Male"
+    rows = [f"{v['gene']}  {v['variant']}  {v['classification']}  Carrier" for v in p["variants"]]
+    negatives = [g for g in knowledge.kb()["genes"] if g not in {v["gene"] for v in p["variants"]}]
+    return "\n".join(["DEMO PREMARITAL SCREENING LAB",
+                      "Expanded carrier screening report - FICTIONAL DEMO, NOT A REAL PERSON",
+                      f"Name: {p['name']} (demo)  Sex: {sex}  Date of birth: 01/01/1997",
+                      "RESULTS", "Gene  Variant  Classification  Status", *rows,
+                      "No pathogenic variants detected in: " + ", ".join(negatives) + ".",
+                      "A child can be affected only if both parents carry a change in the same gene."])
+
+
+def test_report_parser_reads_every_sample_report_exactly():
+    pids = list(knowledge.personas())
+    for pid, got in zip(pids, _parse_reports([_report_text(p) for p in pids])):
+        want = knowledge.personas()[pid]
+        assert got["sex"] == want["sex"] and got["name"] == want["name"], pid
+        assert [(f["gene"], f["classification"]) for f in got["findings"]] == \
+               [(v["gene"], v["classification"]) for v in want["variants"]], pid
+        # genes listed as "not detected" must never become findings
+        assert not set(got["negative"]) & {f["gene"] for f in got["findings"]}, pid
+
+
+def test_report_parser_handles_tricky_lines():
+    texts = [
+        "LAB\nsex: m\nCFTR  c.1521_1523del (p.Phe508del)  Likely pathogenic  Carrier",   # likely pathogenic, lower case
+        "LAB\nHBB  c.9C>T  Benign\nGJB2  c.101T>C  VUS",                                 # benign ignored, VUS kept
+        "LAB\nMEFV  c.2080A>G (p.Met694Val)  Pathogenic  Carrier",                       # gene not covered by the app
+        "LAB\nHBB and CFTR  Pathogenic",                                                 # ambiguous: two genes on one line
+        "Holiday photo, no lab results here",                                            # not a report
+    ]
+    likely, vus, uncovered, ambiguous, nothing = _parse_reports(texts)
+    assert likely["sex"] == "M" and likely["findings"] == [
+        {"gene": "CFTR", "variant": "c.1521_1523del (p.Phe508del)", "classification": "Likely pathogenic"}]
+    assert [f["gene"] for f in vus["findings"]] == ["GJB2"] and vus["findings"][0]["classification"] == "Uncertain significance"
+    assert uncovered["findings"] == [] and uncovered["notCovered"] == ["MEFV"]
+    assert ambiguous["findings"] == []
+    assert nothing["findings"] == [] and nothing["negative"] == [] and nothing["notCovered"] == []
+
+
+def test_sample_reports_exist_and_panel_endpoint_lists_the_genes():
+    c = TestClient(app)
+    panel = c.get("/api/panel").json()
+    assert panel["genes"] == list(knowledge.kb()["genes"]) and panel["inheritance"]["G6PD"] == "XL"
+    for pid in knowledge.personas():
+        r = c.get(f"/samples/{pid}_report.pdf")
+        assert r.status_code == 200 and r.content.startswith(b"%PDF-") and b"FICTIONAL DEMO" in r.content
