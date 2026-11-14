@@ -458,3 +458,10 @@ def test_colab_notebook_is_valid_and_its_python_compiles():
         # Lines starting with ! or % are Colab shell/magic commands, not Python.
         python = "\n".join("" if line.lstrip().startswith(("!", "%")) else line for line in src.splitlines())
         compile(python, "notebook cell", "exec")
+
+
+def test_browsers_always_check_for_a_new_version():
+    """A redeploy must reach phones at once: no file may be reused without asking the server."""
+    c = TestClient(app)
+    for path in ["/", "/partner.html", "/app.js", "/sw.js", "/api/health"]:
+        assert c.get(path).headers.get("cache-control") == "no-cache", path

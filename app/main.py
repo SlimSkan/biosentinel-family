@@ -283,6 +283,16 @@ def list_cases(x_counsellor_key: str = Header("")):
 
 
 # ---------------------------------------------------------------- web app
+@app.middleware("http")
+async def always_check_for_updates(request, call_next):
+    """Tell browsers to check for a newer file every time (a cheap 'not modified' reply if
+    nothing changed). Without this header a browser may reuse an old app.js for hours
+    after a new version is deployed."""
+    response = await call_next(request)
+    response.headers.setdefault("Cache-Control", "no-cache")
+    return response
+
+
 @app.get("/")
 def home():
     return FileResponse(WEB / "index.html")
