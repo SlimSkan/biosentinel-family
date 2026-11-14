@@ -62,7 +62,12 @@ const T = {
     shareWhat: "Choose what the counsellor will see:", shareShared: "Our shared gene(s)",
     shareMine: "My findings that need a counsellor", shareQuiz: "My quick-check score",
     contact: "How should the counsellor contact you? (optional)", note: "Message (optional)",
-    preview: "The counsellor will see exactly this:", send: "Send to counsellor",
+    preview: "The counsellor will see only this:", send: "Send to counsellor",
+    reasonLabel: { vus: "uncertain result (VUS)", xl_carrier_female: "carries an X-linked change (sons may be affected)" },
+    sumShared: "Gene you both carry", sumMine: "My other findings", sumFeel: "Feeling",
+    sumQuiz: "Quick-check score", sumQuizVal: (n) => `${n} of 3 correct`, sumNotShared: "not shared",
+    sumNotDone: "not done yet", sumLang: "Language", sumContact: "Contact", sumNote: "Message",
+    sumNoName: "Your name and your other results are not sent.",
     sent: (id) => `Sent. Case number ${id}. A counsellor will contact you.`,
     recRequired: "We strongly recommend talking with a genetic counsellor.",
     recOptional: "Talking with a counsellor is your choice.",
@@ -133,6 +138,11 @@ const T = {
     shareMine: "نتائجي التي تحتاج إلى مستشار", shareQuiz: "نتيجة التحقق السريع",
     contact: "كيف يتواصل معك المستشار؟ (اختياري)", note: "رسالة (اختيارية)",
     preview: "سيرى المستشار هذا فقط:", send: "أرسل إلى المستشار",
+    reasonLabel: { vus: "نتيجة غير مؤكدة (VUS)", xl_carrier_female: "تحمل تغيّراً مرتبطاً بالكروموسوم X (قد يتأثر الأبناء الذكور)" },
+    sumShared: "الجين الذي يحمله كلاكما", sumMine: "نتائجي الأخرى", sumFeel: "الشعور",
+    sumQuiz: "نتيجة التحقق السريع", sumQuizVal: (n) => `${n} من 3 إجابات صحيحة`, sumNotShared: "غير مُرسلة",
+    sumNotDone: "لم يُجرَ بعد", sumLang: "اللغة", sumContact: "وسيلة التواصل", sumNote: "الرسالة",
+    sumNoName: "لا يُرسَل اسمك ولا نتائجك الأخرى.",
     sent: (id) => `تم الإرسال. رقم الحالة ${id}. سيتواصل معك مستشار.`,
     recRequired: "ننصح بشدة بالتحدث مع مستشار وراثي.",
     recOptional: "التحدث مع مستشار هو اختيارك.",
@@ -327,7 +337,8 @@ function renderCouple() {
 
 // ------------------------------------------------------------------ 5. counsellor hand-off
 function renderCounsel() {
-  const mine = S.findings.filter((f) => f.finding.escalation !== "none").map((f) => `${f.variant.gene}: ${f.finding.reason}`);
+  const label = (r) => t().reasonLabel[r] || r;
+  const mine = S.findings.filter((f) => f.finding.escalation !== "none").map((f) => `${f.variant.gene}: ${label(f.finding.reason)}`);
   const required = S.couple?.risks.length || S.findings.some((f) => f.finding.escalation === "required");
   $("counsel").innerHTML = `
     <p class="${required ? "flag" : ""}">${required ? t().recRequired : t().recOptional}</p>
@@ -339,7 +350,7 @@ function renderCounsel() {
     <label><input type="checkbox" id="sh-quiz"> ${t().shareQuiz}</label>
     <label>${t().contact}<input type="text" id="sh-contact"></label>
     <label>${t().note}<input type="text" id="sh-note"></label>
-    <p class="small">${t().preview}</p><pre class="card small" id="sh-preview"></pre>
+    <p class="small">${t().preview}</p><div class="card small" id="sh-preview"></div>
     <button id="sh-send">${t().send}</button><div id="sh-out"></div>`;
   const build = () => {
     const feel = document.querySelector("input[name=feel]:checked")?.value;
@@ -349,7 +360,25 @@ function renderCounsel() {
     return { shared_genes: $("sh-shared")?.checked ? S.shared : [], other_reasons: reasons, language: S.lang,
              quiz_score: $("sh-quiz").checked ? S.quizScore : null, contact: $("sh-contact").value, note: $("sh-note").value };
   };
-  const refresh = () => ($("sh-preview").textContent = JSON.stringify(build(), null, 2));
+  // Show the same data that is sent, in plain words (the server receives short codes).
+  const summary = (b) => {
+    const mineSent = b.other_reasons.filter((r) => r.includes(":")).map((r) => {
+      const [gene, code] = r.split(":"); return `${gene}: ${label(code)}`; });
+    const worried = b.other_reasons.includes("feels worried");
+    const quiz = b.quiz_score === null ? ($("sh-quiz").checked ? t().sumNotDone : t().sumNotShared) : t().sumQuizVal(b.quiz_score);
+    const rows = [
+      b.shared_genes.length && [t().sumShared, b.shared_genes.join(", ")],
+      mineSent.length && [t().sumMine, mineSent.join("; ")],
+      worried && [t().sumFeel, t().feelings[2]],
+      [t().sumQuiz, quiz],
+      [t().sumLang, b.language === "ar" ? "العربية" : "English"],
+      [t().sumContact, b.contact || "—"],
+      [t().sumNote, b.note || "—"],
+    ].filter(Boolean);
+    return `<table class="imp">${rows.map(([k, v]) => `<tr><th>${esc(k)}</th><td>${esc(v)}</td></tr>`).join("")}</table>
+      <div>${esc(t().sumNoName)}</div>`;
+  };
+  const refresh = () => ($("sh-preview").innerHTML = summary(build()));
   $("counsel").oninput = refresh; $("counsel").onchange = refresh; refresh();
   $("sh-send").onclick = async () => {
     const { id } = await api("/api/cases", build());

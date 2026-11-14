@@ -25,6 +25,8 @@
     const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
     // On the public demo the inbox needs the counsellor key. It is kept for this tab only.
     const key = () => { try { return sessionStorage.getItem("bsf-ckey") || ""; } catch { return ""; } };
+    const REASON = { vus: "uncertain result (VUS)", xl_carrier_female: "woman carrying an X-linked change (sons may be affected)" };
+    const reason = (r) => { const [g, code] = r.split(":"); return code && REASON[code] ? `${g}: ${REASON[code]}` : r; };
     async function load() {
       const r = await fetch("/api/cases", { headers: { "X-Counsellor-Key": key() } });
       if (r.status === 401) {
@@ -37,8 +39,8 @@
         <div class="card">
           <h3>Case ${c.id} · ${esc(c.received)} · ${esc(c.status)}</h3>
           ${c.shared_genes.length ? `<div class="flag">Shared carrier gene(s): ${esc(c.shared_genes.join(", "))}</div>` : ""}
-          ${c.other_reasons.length ? `<div>Other reasons: ${esc(c.other_reasons.join("; "))}</div>` : ""}
-          <div class="small">Language: ${esc(c.language)} · Quick-check score: ${c.quiz_score ?? "not shared"}</div>
+          ${c.other_reasons.length ? `<div>Other reasons: ${esc(c.other_reasons.map(reason).join("; "))}</div>` : ""}
+          <div class="small">Language: ${c.language === "ar" ? "Arabic" : "English"} · Quick-check score: ${c.quiz_score === null ? "not shared" : `${c.quiz_score} of 3`}</div>
           ${c.contact ? `<div>Contact: ${esc(c.contact)}</div>` : ""}
           ${c.note ? `<div>Message: ${esc(c.note)}</div>` : ""}
         </div>`).join("") : "<p>No cases yet.</p>";
