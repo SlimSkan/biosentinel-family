@@ -1,5 +1,7 @@
 # BioSentinel Family
 
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/SlimSkan/biosentinel-family/blob/main/notebooks/gemma_live.ipynb)
+
 **Know together. Decide freely.** A private, Arabic–English companion that helps couples in the
 UAE understand their premarital genetic screening results, find out privately whether they carry
 a change in the same gene, and reach a genetic counsellor.
@@ -28,6 +30,16 @@ The demo sleeps when nobody uses it: the first visit can take about a minute to 
 
 The online demo runs on a free server without a GPU, so the AI rewriting (Gemma 4) is switched off there and the
 reviewed texts are shown. Run it locally with Ollama to see Gemma's rewrites.
+
+## See Gemma 4 live
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/SlimSkan/biosentinel-family/blob/main/notebooks/gemma_live.ipynb)
+
+The online demo has no GPU, so its AI rewriting is off. This Colab notebook runs the same code with
+**Gemma 4 on Colab's free T4 GPU**, in your own Colab session: Gemma's rewrites in English and
+Arabic with the guardrails' decisions, the guardrails blocking unsafe text, the test suite, and the
+full app with Gemma switched on. Choose **Runtime → Change runtime type → T4 GPU**, then
+**Runtime → Run all** (about 8 minutes, mostly downloading Gemma).
 
 ## How it works
 

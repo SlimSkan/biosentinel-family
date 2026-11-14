@@ -443,3 +443,18 @@ def test_sample_reports_exist_and_panel_endpoint_lists_the_genes():
     for pid in knowledge.personas():
         r = c.get(f"/samples/{pid}_report.pdf")
         assert r.status_code == 200 and r.content.startswith(b"%PDF-") and b"FICTIONAL DEMO" in r.content
+
+
+# ------------------------------------------------------------------ Colab notebook for the jury
+def test_colab_notebook_is_valid_and_its_python_compiles():
+    nb = json.loads((ROOT / "notebooks" / "gemma_live.ipynb").read_text(encoding="utf-8"))
+    assert nb["nbformat"] == 4 and nb["metadata"]["accelerator"] == "GPU"
+    text = json.dumps(nb)
+    assert "github.com/SlimSkan/biosentinel-family" in text and "gemma4:e4b" in text
+    for cell in nb["cells"]:
+        if cell["cell_type"] != "code":
+            continue
+        src = "".join(cell["source"])
+        # Lines starting with ! or % are Colab shell/magic commands, not Python.
+        python = "\n".join("" if line.lstrip().startswith(("!", "%")) else line for line in src.splitlines())
+        compile(python, "notebook cell", "exec")
