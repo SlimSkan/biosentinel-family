@@ -1,6 +1,7 @@
 // BioSentinel Family - the page a RELATIVE opens from a family invite.
 // The link holds only a random id. This page never learns who sent it, and the
 // relative's answers (relation, contact) stay here unless they choose to send them.
+import { seal } from "./seal.js";
 
 const T = {
   en: {
@@ -121,8 +122,22 @@ function renderNext() {
     $("next-out").innerHTML = `<label>${t().contact}<input type="text" id="contact"></label><button id="send">${t().send}</button><div id="sent"></div>`;
     $("send").onclick = async () => {
       // The counsellor sees: one gene, that it came from a family invite, language and contact. No relation.
-      const { id } = await api("/api/cases", { shared_genes: [], other_reasons: [`family invite: ${S.invite.gene}`],
-        language: S.lang, contact: $("contact").value });
+      // Encrypted on this phone for the counsellor's devices (web/seal.js). The server stores ciphertext only.
+      const gene = S.invite.gene;
+      const brief = { priority: "routine", reasons: [`Family invite: relative of someone who carries a change in ${gene}`],
+        risks: [], understanding: "Relative, not yet tested. Read the family-invite explanation.", picks: [], feeling: "",
+        family: [], agenda: [`Offer carrier testing for ${gene}.`, "Explain what the result would mean for them."],
+        facts: [{ id: "F1", text: `Relative of a ${gene} carrier, reached through a private family invite.` }],
+        summary: `Relative of a ${gene} carrier asks for counselling about carrier testing.`, summary_source: "rules",
+        summary_sources: [], language: S.lang,
+        disclaimer: "Educational pre-consultation summary. Not a diagnosis." };
+      const devices = await api("/api/counsellor/devices").catch(() => []);
+      if (!devices.length) {     // never send it unencrypted
+        $("sent").innerHTML = `<p class="flag">${S.lang === "ar" ? "لا يوجد جهاز مستشار متصل بعد، لذلك لم يُرسل شيء." : "No counsellor device is connected yet, so nothing was sent."}</p>`;
+        return;
+      }
+      const sealed = await seal({ brief, contact: $("contact").value, note: "" }, devices);
+      const { id } = await api("/api/cases", { service: "clinic", priority: "routine", sealed });
       $("sent").innerHTML = `<p class="ok">${esc(t().sent(id))}</p>`;
       $("send").disabled = true;
     };

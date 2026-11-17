@@ -18,3 +18,7 @@ services:
       # the service's Environment tab and put it on slide 11 of the deck.
       - key: BSF_COUNSELLOR_KEY
         generateValue: true
+      # Live AI: Gemma 4 through Google's Gemini API (free key from aistudio.google.com/apikey).
+      # Entered by the owner in the Environment tab; never committed. Without it, AI is off.
+      - key: GEMINI_API_KEY
+        sync: false

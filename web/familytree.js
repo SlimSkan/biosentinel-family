@@ -141,9 +141,10 @@ export async function renderTree(el, { lang, genes, sex, api, state, onInvite, o
   if (inv) inv.onclick = () => onInvite?.(state.gene);
 }
 
-// A short, name-free description for the counsellor brief.
-export function treeSummary(state, lang) {
-  const t = L[lang];
-  const marked = Object.entries(state.tested || {}).map(([id, v]) => `${t.rel[id]}: ${t[v]}`);
-  return marked.length ? `${state.gene} — ${marked.join("; ")}` : "";
+// A short, name-free description for the counsellor brief (always in English: the brief is clinical).
+export function treeSummary(state, lang = "en") {
+  const t = L.en;
+  const said = { carrier: "carries it (tested)", not_carrier: "does not carry it (tested)" };
+  const marked = Object.entries(state.tested || {}).map(([id, v]) => `${t.rel[id].toLowerCase()} ${said[v]}`);
+  return marked.length ? `${state.gene}: ${marked.join("; ")}` : "";
 }

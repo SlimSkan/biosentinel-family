@@ -154,6 +154,7 @@ def answer(question: str, findings: list[dict], shared: list[str], lang: str = "
     raw = re.sub(r"NO_?ANSWER", "", re.sub(r"[*#`]+", "", raw)).strip()
     if not _CITE.search(raw):
         return refusal | {"problems": ["model said it cannot answer from the facts"]}
+    raw = re.sub(r"([.!?؟])\s*((?:\[F\d+\]\s*)+)", lambda m: " " + m.group(2).strip() + m.group(1) + " ", raw).strip()
     sentences = [s for s in re.split(r"(?<=[.!?؟\]])\s+", raw) if s.strip()]
     cited = {int(n) for n in _CITE.findall(raw)}
     problems = []

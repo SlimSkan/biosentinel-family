@@ -1,0 +1,959 @@
+{
+ "resourceType": "Bundle",
+ "type": "collection",
+ "meta": {
+  "tag": [
+   {
+    "code": "fictional-demo"
+   }
+  ]
+ },
+ "entry": [
+  {
+   "fullUrl": "urn:uuid:amina-patient-p1",
+   "resource": {
+    "resourceType": "Patient",
+    "id": "p1",
+    "name": [
+     {
+      "given": [
+       "Amina"
+      ]
+     }
+    ],
+    "gender": "female"
+   }
+  },
+  {
+   "fullUrl": "urn:uuid:amina-organization-lab",
+   "resource": {
+    "resourceType": "Organization",
+    "id": "lab",
+    "name": "Demo Premarital Screening Lab"
+   }
+  },
+  {
+   "fullUrl": "urn:uuid:amina-diagnosticreport-r1",
+   "resource": {
+    "resourceType": "DiagnosticReport",
+    "id": "r1",
+    "status": "final",
+    "meta": {
+     "profile": [
+      "http://hl7.org/fhir/uv/genomics-reporting/StructureDefinition/genomic-report"
+     ]
+    },
+    "code": {
+     "coding": [
+      {
+       "system": "http://loinc.org",
+       "code": "51969-4",
+       "display": "Genetic analysis report"
+      }
+     ]
+    },
+    "subject": {
+     "reference": "Patient/p1"
+    },
+    "performer": [
+     {
+      "reference": "Organization/lab"
+     }
+    ],
+    "conclusion": "Fictional demo result. Carrier screening, 10-gene premarital panel.",
+    "result": [
+     {
+      "reference": "Observation/variant-1"
+     },
+     {
+      "reference": "Observation/variant-2"
+     },
+     {
+      "reference": "Observation/variant-3"
+     },
+     {
+      "reference": "Observation/variant-101"
+     },
+     {
+      "reference": "Observation/variant-103"
+     },
+     {
+      "reference": "Observation/variant-104"
+     },
+     {
+      "reference": "Observation/variant-105"
+     },
+     {
+      "reference": "Observation/variant-106"
+     },
+     {
+      "reference": "Observation/variant-107"
+     },
+     {
+      "reference": "Observation/variant-109"
+     }
+    ]
+   }
+  },
+  {
+   "fullUrl": "urn:uuid:amina-observation-variant-1",
+   "resource": {
+    "resourceType": "Observation",
+    "id": "variant-1",
+    "status": "final",
+    "meta": {
+     "profile": [
+      "http://hl7.org/fhir/uv/genomics-reporting/StructureDefinition/variant"
+     ]
+    },
+    "category": [
+     {
+      "coding": [
+       {
+        "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+        "code": "laboratory",
+        "display": "Laboratory"
+       }
+      ]
+     }
+    ],
+    "code": {
+     "coding": [
+      {
+       "system": "http://loinc.org",
+       "code": "69548-6",
+       "display": "Genetic variant assessment"
+      }
+     ]
+    },
+    "subject": {
+     "reference": "Patient/p1"
+    },
+    "valueCodeableConcept": {
+     "coding": [
+      {
+       "system": "http://loinc.org",
+       "code": "LA9633-4",
+       "display": "Present"
+      }
+     ]
+    },
+    "component": [
+     {
+      "code": {
+       "coding": [
+        {
+         "system": "http://loinc.org",
+         "code": "48018-6",
+         "display": "Gene studied [ID]"
+        }
+       ]
+      },
+      "valueCodeableConcept": {
+       "coding": [
+        {
+         "system": "http://www.genenames.org/geneId",
+         "code": "HGNC:4827",
+         "display": "HBB"
+        }
+       ]
+      }
+     },
+     {
+      "code": {
+       "coding": [
+        {
+         "system": "http://loinc.org",
+         "code": "48004-6",
+         "display": "DNA change (c.HGVS)"
+        }
+       ]
+      },
+      "valueCodeableConcept": {
+       "text": "c.20A>T"
+      }
+     },
+     {
+      "code": {
+       "coding": [
+        {
+         "system": "http://loinc.org",
+         "code": "48005-3",
+         "display": "Amino acid change (pHGVS)"
+        }
+       ]
+      },
+      "valueCodeableConcept": {
+       "text": "p.Glu7Val"
+      }
+     },
+     {
+      "code": {
+       "coding": [
+        {
+         "system": "http://loinc.org",
+         "code": "53034-5",
+         "display": "Allelic state"
+        }
+       ]
+      },
+      "valueCodeableConcept": {
+       "coding": [
+        {
+         "system": "http://loinc.org",
+         "code": "LA6706-1",
+         "display": "Heterozygous"
+        }
+       ]
+      }
+     },
+     {
+      "code": {
+       "coding": [
+        {
+         "system": "http://loinc.org",
+         "code": "53037-8",
+         "display": "Genetic variation clinical significance"
+        }
+       ]
+      },
+      "valueCodeableConcept": {
+       "coding": [
+        {
+         "system": "http://loinc.org",
+         "code": "LA6668-3",
+         "display": "Pathogenic"
+        }
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "fullUrl": "urn:uuid:amina-observation-variant-2",
+   "resource": {
+    "resourceType": "Observation",
+    "id": "variant-2",
+    "status": "final",
+    "meta": {
+     "profile": [
+      "http://hl7.org/fhir/uv/genomics-reporting/StructureDefinition/variant"
+     ]
+    },
+    "category": [
+     {
+      "coding": [
+       {
+        "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+        "code": "laboratory",
+        "display": "Laboratory"
+       }
+      ]
+     }
+    ],
+    "code": {
+     "coding": [
+      {
+       "system": "http://loinc.org",
+       "code": "69548-6",
+       "display": "Genetic variant assessment"
+      }
+     ]
+    },
+    "subject": {
+     "reference": "Patient/p1"
+    },
+    "valueCodeableConcept": {
+     "coding": [
+      {
+       "system": "http://loinc.org",
+       "code": "LA9633-4",
+       "display": "Present"
+      }
+     ]
+    },
+    "component": [
+     {
+      "code": {
+       "coding": [
+        {
+         "system": "http://loinc.org",
+         "code": "48018-6",
+         "display": "Gene studied [ID]"
+        }
+       ]
+      },
+      "valueCodeableConcept": {
+       "coding": [
+        {
+         "system": "http://www.genenames.org/geneId",
+         "code": "HGNC:4057",
+         "display": "G6PD"
+        }
+       ]
+      }
+     },
+     {
+      "code": {
+       "coding": [
+        {
+         "system": "http://loinc.org",
+         "code": "48004-6",
+         "display": "DNA change (c.HGVS)"
+        }
+       ]
+      },
+      "valueCodeableConcept": {
+       "text": "c.563C>T"
+      }
+     },
+     {
+      "code": {
+       "coding": [
+        {
+         "system": "http://loinc.org",
+         "code": "48005-3",
+         "display": "Amino acid change (pHGVS)"
+        }
+       ]
+      },
+      "valueCodeableConcept": {
+       "text": "p.Ser188Phe"
+      }
+     },
+     {
+      "code": {
+       "coding": [
+        {
+         "system": "http://loinc.org",
+         "code": "53034-5",
+         "display": "Allelic state"
+        }
+       ]
+      },
+      "valueCodeableConcept": {
+       "coding": [
+        {
+         "system": "http://loinc.org",
+         "code": "LA6706-1",
+         "display": "Heterozygous"
+        }
+       ]
+      }
+     },
+     {
+      "code": {
+       "coding": [
+        {
+         "system": "http://loinc.org",
+         "code": "53037-8",
+         "display": "Genetic variation clinical significance"
+        }
+       ]
+      },
+      "valueCodeableConcept": {
+       "coding": [
+        {
+         "system": "http://loinc.org",
+         "code": "LA6668-3",
+         "display": "Pathogenic"
+        }
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "fullUrl": "urn:uuid:amina-observation-variant-3",
+   "resource": {
+    "resourceType": "Observation",
+    "id": "variant-3",
+    "status": "final",
+    "meta": {
+     "profile": [
+      "http://hl7.org/fhir/uv/genomics-reporting/StructureDefinition/variant"
+     ]
+    },
+    "category": [
+     {
+      "coding": [
+       {
+        "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+        "code": "laboratory",
+        "display": "Laboratory"
+       }
+      ]
+     }
+    ],
+    "code": {
+     "coding": [
+      {
+       "system": "http://loinc.org",
+       "code": "69548-6",
+       "display": "Genetic variant assessment"
+      }
+     ]
+    },
+    "subject": {
+     "reference": "Patient/p1"
+    },
+    "valueCodeableConcept": {
+     "coding": [
+      {
+       "system": "http://loinc.org",
+       "code": "LA9633-4",
+       "display": "Present"
+      }
+     ]
+    },
+    "component": [
+     {
+      "code": {
+       "coding": [
+        {
+         "system": "http://loinc.org",
+         "code": "48018-6",
+         "display": "Gene studied [ID]"
+        }
+       ]
+      },
+      "valueCodeableConcept": {
+       "coding": [
+        {
+         "system": "http://www.genenames.org/geneId",
+         "code": "HGNC:4284",
+         "display": "GJB2"
+        }
+       ]
+      }
+     },
+     {
+      "code": {
+       "coding": [
+        {
+         "system": "http://loinc.org",
+         "code": "48004-6",
+         "display": "DNA change (c.HGVS)"
+        }
+       ]
+      },
+      "valueCodeableConcept": {
+       "text": "c.35delG"
+      }
+     },
+     {
+      "code": {
+       "coding": [
+        {
+         "system": "http://loinc.org",
+         "code": "53034-5",
+         "display": "Allelic state"
+        }
+       ]
+      },
+      "valueCodeableConcept": {
+       "coding": [
+        {
+         "system": "http://loinc.org",
+         "code": "LA6706-1",
+         "display": "Heterozygous"
+        }
+       ]
+      }
+     },
+     {
+      "code": {
+       "coding": [
+        {
+         "system": "http://loinc.org",
+         "code": "53037-8",
+         "display": "Genetic variation clinical significance"
+        }
+       ]
+      },
+      "valueCodeableConcept": {
+       "coding": [
+        {
+         "system": "http://loinc.org",
+         "code": "LA6668-3",
+         "display": "Pathogenic"
+        }
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "fullUrl": "urn:uuid:amina-observation-variant-101",
+   "resource": {
+    "resourceType": "Observation",
+    "id": "variant-101",
+    "status": "final",
+    "meta": {
+     "profile": [
+      "http://hl7.org/fhir/uv/genomics-reporting/StructureDefinition/variant"
+     ]
+    },
+    "category": [
+     {
+      "coding": [
+       {
+        "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+        "code": "laboratory",
+        "display": "Laboratory"
+       }
+      ]
+     }
+    ],
+    "code": {
+     "coding": [
+      {
+       "system": "http://loinc.org",
+       "code": "69548-6",
+       "display": "Genetic variant assessment"
+      }
+     ]
+    },
+    "subject": {
+     "reference": "Patient/p1"
+    },
+    "valueCodeableConcept": {
+     "coding": [
+      {
+       "system": "http://loinc.org",
+       "code": "LA9634-2",
+       "display": "Absent"
+      }
+     ]
+    },
+    "component": [
+     {
+      "code": {
+       "coding": [
+        {
+         "system": "http://loinc.org",
+         "code": "48018-6",
+         "display": "Gene studied [ID]"
+        }
+       ]
+      },
+      "valueCodeableConcept": {
+       "coding": [
+        {
+         "system": "http://www.genenames.org/geneId",
+         "code": "HGNC:1884",
+         "display": "CFTR"
+        }
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "fullUrl": "urn:uuid:amina-observation-variant-103",
+   "resource": {
+    "resourceType": "Observation",
+    "id": "variant-103",
+    "status": "final",
+    "meta": {
+     "profile": [
+      "http://hl7.org/fhir/uv/genomics-reporting/StructureDefinition/variant"
+     ]
+    },
+    "category": [
+     {
+      "coding": [
+       {
+        "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+        "code": "laboratory",
+        "display": "Laboratory"
+       }
+      ]
+     }
+    ],
+    "code": {
+     "coding": [
+      {
+       "system": "http://loinc.org",
+       "code": "69548-6",
+       "display": "Genetic variant assessment"
+      }
+     ]
+    },
+    "subject": {
+     "reference": "Patient/p1"
+    },
+    "valueCodeableConcept": {
+     "coding": [
+      {
+       "system": "http://loinc.org",
+       "code": "LA9634-2",
+       "display": "Absent"
+      }
+     ]
+    },
+    "component": [
+     {
+      "code": {
+       "coding": [
+        {
+         "system": "http://loinc.org",
+         "code": "48018-6",
+         "display": "Gene studied [ID]"
+        }
+       ]
+      },
+      "valueCodeableConcept": {
+       "coding": [
+        {
+         "system": "http://www.genenames.org/geneId",
+         "code": "HGNC:11117",
+         "display": "SMN1"
+        }
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "fullUrl": "urn:uuid:amina-observation-variant-104",
+   "resource": {
+    "resourceType": "Observation",
+    "id": "variant-104",
+    "status": "final",
+    "meta": {
+     "profile": [
+      "http://hl7.org/fhir/uv/genomics-reporting/StructureDefinition/variant"
+     ]
+    },
+    "category": [
+     {
+      "coding": [
+       {
+        "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+        "code": "laboratory",
+        "display": "Laboratory"
+       }
+      ]
+     }
+    ],
+    "code": {
+     "coding": [
+      {
+       "system": "http://loinc.org",
+       "code": "69548-6",
+       "display": "Genetic variant assessment"
+      }
+     ]
+    },
+    "subject": {
+     "reference": "Patient/p1"
+    },
+    "valueCodeableConcept": {
+     "coding": [
+      {
+       "system": "http://loinc.org",
+       "code": "LA9634-2",
+       "display": "Absent"
+      }
+     ]
+    },
+    "component": [
+     {
+      "code": {
+       "coding": [
+        {
+         "system": "http://loinc.org",
+         "code": "48018-6",
+         "display": "Gene studied [ID]"
+        }
+       ]
+      },
+      "valueCodeableConcept": {
+       "coding": [
+        {
+         "system": "http://www.genenames.org/geneId",
+         "code": "HGNC:8582",
+         "display": "PAH"
+        }
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "fullUrl": "urn:uuid:amina-observation-variant-105",
+   "resource": {
+    "resourceType": "Observation",
+    "id": "variant-105",
+    "status": "final",
+    "meta": {
+     "profile": [
+      "http://hl7.org/fhir/uv/genomics-reporting/StructureDefinition/variant"
+     ]
+    },
+    "category": [
+     {
+      "coding": [
+       {
+        "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+        "code": "laboratory",
+        "display": "Laboratory"
+       }
+      ]
+     }
+    ],
+    "code": {
+     "coding": [
+      {
+       "system": "http://loinc.org",
+       "code": "69548-6",
+       "display": "Genetic variant assessment"
+      }
+     ]
+    },
+    "subject": {
+     "reference": "Patient/p1"
+    },
+    "valueCodeableConcept": {
+     "coding": [
+      {
+       "system": "http://loinc.org",
+       "code": "LA9634-2",
+       "display": "Absent"
+      }
+     ]
+    },
+    "component": [
+     {
+      "code": {
+       "coding": [
+        {
+         "system": "http://loinc.org",
+         "code": "48018-6",
+         "display": "Gene studied [ID]"
+        }
+       ]
+      },
+      "valueCodeableConcept": {
+       "coding": [
+        {
+         "system": "http://www.genenames.org/geneId",
+         "code": "HGNC:4878",
+         "display": "HEXA"
+        }
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "fullUrl": "urn:uuid:amina-observation-variant-106",
+   "resource": {
+    "resourceType": "Observation",
+    "id": "variant-106",
+    "status": "final",
+    "meta": {
+     "profile": [
+      "http://hl7.org/fhir/uv/genomics-reporting/StructureDefinition/variant"
+     ]
+    },
+    "category": [
+     {
+      "coding": [
+       {
+        "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+        "code": "laboratory",
+        "display": "Laboratory"
+       }
+      ]
+     }
+    ],
+    "code": {
+     "coding": [
+      {
+       "system": "http://loinc.org",
+       "code": "69548-6",
+       "display": "Genetic variant assessment"
+      }
+     ]
+    },
+    "subject": {
+     "reference": "Patient/p1"
+    },
+    "valueCodeableConcept": {
+     "coding": [
+      {
+       "system": "http://loinc.org",
+       "code": "LA9634-2",
+       "display": "Absent"
+      }
+     ]
+    },
+    "component": [
+     {
+      "code": {
+       "coding": [
+        {
+         "system": "http://loinc.org",
+         "code": "48018-6",
+         "display": "Gene studied [ID]"
+        }
+       ]
+      },
+      "valueCodeableConcept": {
+       "coding": [
+        {
+         "system": "http://www.genenames.org/geneId",
+         "code": "HGNC:1122",
+         "display": "BTD"
+        }
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "fullUrl": "urn:uuid:amina-observation-variant-107",
+   "resource": {
+    "resourceType": "Observation",
+    "id": "variant-107",
+    "status": "final",
+    "meta": {
+     "profile": [
+      "http://hl7.org/fhir/uv/genomics-reporting/StructureDefinition/variant"
+     ]
+    },
+    "category": [
+     {
+      "coding": [
+       {
+        "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+        "code": "laboratory",
+        "display": "Laboratory"
+       }
+      ]
+     }
+    ],
+    "code": {
+     "coding": [
+      {
+       "system": "http://loinc.org",
+       "code": "69548-6",
+       "display": "Genetic variant assessment"
+      }
+     ]
+    },
+    "subject": {
+     "reference": "Patient/p1"
+    },
+    "valueCodeableConcept": {
+     "coding": [
+      {
+       "system": "http://loinc.org",
+       "code": "LA9634-2",
+       "display": "Absent"
+      }
+     ]
+    },
+    "component": [
+     {
+      "code": {
+       "coding": [
+        {
+         "system": "http://loinc.org",
+         "code": "48018-6",
+         "display": "Gene studied [ID]"
+        }
+       ]
+      },
+      "valueCodeableConcept": {
+       "coding": [
+        {
+         "system": "http://www.genenames.org/geneId",
+         "code": "HGNC:2600",
+         "display": "CYP21A2"
+        }
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "fullUrl": "urn:uuid:amina-observation-variant-109",
+   "resource": {
+    "resourceType": "Observation",
+    "id": "variant-109",
+    "status": "final",
+    "meta": {
+     "profile": [
+      "http://hl7.org/fhir/uv/genomics-reporting/StructureDefinition/variant"
+     ]
+    },
+    "category": [
+     {
+      "coding": [
+       {
+        "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+        "code": "laboratory",
+        "display": "Laboratory"
+       }
+      ]
+     }
+    ],
+    "code": {
+     "coding": [
+      {
+       "system": "http://loinc.org",
+       "code": "69548-6",
+       "display": "Genetic variant assessment"
+      }
+     ]
+    },
+    "subject": {
+     "reference": "Patient/p1"
+    },
+    "valueCodeableConcept": {
+     "coding": [
+      {
+       "system": "http://loinc.org",
+       "code": "LA9634-2",
+       "display": "Absent"
+      }
+     ]
+    },
+    "component": [
+     {
+      "code": {
+       "coding": [
+        {
+         "system": "http://loinc.org",
+         "code": "48018-6",
+         "display": "Gene studied [ID]"
+        }
+       ]
+      },
+      "valueCodeableConcept": {
+       "coding": [
+        {
+         "system": "http://www.genenames.org/geneId",
+         "code": "HGNC:2928",
+         "display": "DMD"
+        }
+       ]
+      }
+     }
+    ]
+   }
+  }
+ ]
+}

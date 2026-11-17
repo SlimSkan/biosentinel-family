@@ -4,8 +4,11 @@
 import { PSI } from "./psi.js";
 import { pdfToText } from "./report_reader.js";
 import { parseReportText } from "./report_parser.js";
+import { isFhir, parseFhir } from "./fhir_parser.js";
 import { renderOptions, renderPlan } from "./options.js";
-import { renderTree } from "./familytree.js";
+import { renderTree, treeSummary } from "./familytree.js";
+import { seal } from "./seal.js";
+import { renderBrief } from "./brief_view.js";
 
 // ------------------------------------------------------------------ text (EN / AR)
 const T = {
@@ -35,9 +38,10 @@ const T = {
     shareCode: "Give this code to your partner:", waiting: "Waiting for your partner…",
     shareCodeWa: "Send the code by WhatsApp",
     impTitle: "Import my lab report",
-    impIntro: "Choose the PDF report you received from the screening lab. We read the results from it, then you check them before anything is explained.",
+    impIntro: "Choose the report you received from the screening lab: a PDF, or a standard electronic result (HL7 FHIR, a .json file). We read the results from it, then you check them before anything is explained.",
+    impFhirTry: "Electronic (FHIR) versions:", impFormat: "Format",
     impPrivacy: "Your PDF is read on this phone. It is not uploaded or stored anywhere.",
-    impChoose: "Choose a PDF report", impReading: "Reading your report on this phone…",
+    impChoose: "Choose a report (PDF or FHIR)", impReading: "Reading your report on this phone…",
     impNoReport: "No report at hand? Try a fictional one:",
     impCheck: "This is what we read from your report. Please check it against your paper report.",
     impLab: "Lab", impName: "Name", impSex: "Sex", impFemale: "Female", impMale: "Male", impPickSex: "Choose…",
@@ -74,6 +78,20 @@ const T = {
     sumQuiz: "Quick-check score", sumQuizVal: (n) => `${n} of 3 correct`, sumNotShared: "not shared",
     sumNotDone: "not done yet", sumLang: "Language", sumContact: "Contact", sumNote: "Message",
     sumNoName: "Your name and your other results are not sent.",
+    svcTitle: "Choose a counselling service", svcNote: "Certified genetic counsellors. Demo listings: these services are fictional.",
+    pregQ: "Are you currently pregnant?", pregYes: "Yes", pregNo: "No", pregSkip: "Prefer not to say",
+    pregNote: "If you are pregnant, your request is marked as time-sensitive, because some options depend on timing.",
+    incTitle: "What to include in your summary", incQuiz: "My quick check and what was unclear",
+    incOpts: "Options I want to discuss", incFamily: "Relatives I marked as tested (relationships only)",
+    privateFields: "Only the counsellor can read these.",
+    prepare: "Prepare my summary", preparing: "Preparing your summary…",
+    briefTitle: "Your pre-consultation summary (in English, for the counsellor)",
+    briefNote: "This is exactly what the counsellor will receive. It is encrypted on this phone before sending: the server cannot read it.",
+    sendSealed: "Encrypt and send", sealing: "Encrypting…",
+    noDevice: "No counsellor device is connected yet, so nothing was sent. (Demo: open the counsellor console once, then try again.)",
+    trackTitle: (id, svc) => `Request ${id} · ${svc}`, trackNote: "Encrypted end to end. This page checks for updates while it is open.",
+    st: { new: "Sent", seen: "Seen by the counsellor", contacted: "Counsellor is contacting you", appointment_offered: "Appointment offered" },
+    eduBanner: "Educational decision support. Not a diagnosis: a certified genetic counsellor confirms what results mean.",
     sent: (id) => `Sent. Case number ${id}. A counsellor will contact you.`,
     recRequired: "We strongly recommend talking with a genetic counsellor.",
     recOptional: "Talking with a counsellor is your choice.",
@@ -114,9 +132,10 @@ const T = {
     shareCode: "أعطِ هذا الرمز لشريكك:", waiting: "بانتظار شريكك…",
     shareCodeWa: "أرسل الرمز عبر واتساب",
     impTitle: "استيراد تقرير المختبر",
-    impIntro: "اختر تقرير PDF الذي استلمته من مختبر الفحص. نقرأ النتائج منه، ثم تتحقق منها قبل أي شرح.",
+    impIntro: "اختر التقرير الذي استلمته من مختبر الفحص: ملف PDF، أو نتيجة إلكترونية قياسية (HL7 FHIR، ملف ‎.json). نقرأ النتائج منه، ثم تتحقق منها قبل أي شرح.",
+    impFhirTry: "النسخ الإلكترونية (FHIR):", impFormat: "الصيغة",
     impPrivacy: "يُقرأ ملف PDF على هذا الهاتف فقط، ولا يُرفع ولا يُحفظ في أي مكان.",
-    impChoose: "اختر تقرير PDF", impReading: "تجري قراءة تقريرك على هذا الهاتف…",
+    impChoose: "اختر تقريراً (PDF أو FHIR)", impReading: "تجري قراءة تقريرك على هذا الهاتف…",
     impNoReport: "ليس لديك تقرير؟ جرّب تقريراً وهمياً:",
     impCheck: "هذا ما قرأناه من تقريرك. يرجى مطابقته مع تقريرك الورقي.",
     impLab: "المختبر", impName: "الاسم", impSex: "الجنس", impFemale: "أنثى", impMale: "ذكر", impPickSex: "اختر…",
@@ -153,6 +172,20 @@ const T = {
     sumQuiz: "نتيجة التحقق السريع", sumQuizVal: (n) => `${n} من 3 إجابات صحيحة`, sumNotShared: "غير مُرسلة",
     sumNotDone: "لم يُجرَ بعد", sumLang: "اللغة", sumContact: "وسيلة التواصل", sumNote: "الرسالة",
     sumNoName: "لا يُرسَل اسمك ولا نتائجك الأخرى.",
+    svcTitle: "اختر خدمة استشارة", svcNote: "مستشارون وراثيون معتمدون. قوائم تجريبية: هذه الخدمات وهمية.",
+    pregQ: "هل يوجد حمل حالياً؟", pregYes: "نعم", pregNo: "لا", pregSkip: "أفضّل عدم الإجابة",
+    pregNote: "في حال وجود حمل، يُعلَّم طلبك كطلب عاجل، لأن بعض الخيارات مرتبطة بالتوقيت.",
+    incTitle: "ما الذي يتضمنه ملخصك", incQuiz: "نتيجة التحقق السريع وما لم يكن واضحاً",
+    incOpts: "الخيارات التي أريد مناقشتها", incFamily: "الأقارب الذين حددت أنهم أجروا الفحص (صلة القرابة فقط)",
+    privateFields: "لا يستطيع قراءة هذه المعلومات إلا المستشار.",
+    prepare: "إعداد ملخصي", preparing: "يجري إعداد ملخصك…",
+    briefTitle: "ملخصك قبل الاستشارة (بالإنجليزية، للمستشار)",
+    briefNote: "هذا بالضبط ما سيصل إلى المستشار. يُشفَّر على هذا الهاتف قبل الإرسال، ولا يستطيع الخادم قراءته.",
+    sendSealed: "تشفير وإرسال", sealing: "يجري التشفير…",
+    noDevice: "لا يوجد جهاز مستشار متصل بعد، لذلك لم يُرسل شيء. (تجريبياً: افتح لوحة المستشار مرة واحدة ثم حاول مجدداً.)",
+    trackTitle: (id, svc) => `الطلب ${id} · ${svc}`, trackNote: "مشفّر من طرف إلى طرف. تتحقق هذه الصفحة من التحديثات ما دامت مفتوحة.",
+    st: { new: "أُرسل", seen: "اطّلع عليه المستشار", contacted: "يتواصل معك المستشار", appointment_offered: "عُرض موعد" },
+    eduBanner: "دعم تثقيفي لاتخاذ القرار، وليس تشخيصاً: يؤكد المستشار الوراثي المعتمد معنى النتائج.",
     sent: (id) => `تم الإرسال. رقم الحالة ${id}. سيتواصل معك مستشار.`,
     recRequired: "ننصح بشدة بالتحدث مع مستشار وراثي.",
     recOptional: "التحدث مع مستشار هو اختيارك.",
@@ -180,6 +213,8 @@ const S = {
   missed: [],
   opts: { picks: [] },   // options the couple chose to compare (reviewed, unranked)
   plan: {},              // next-steps checklist state
+  services: null,        // counselling services (demo listings)
+  referral: null,        // {id, token} of the request sent, to follow its status
   tree: {},              // family carrier map: {gene, tested, sel}; relationships only, no names            // ideas the reader got wrong in the quick check (for the counsellor brief)
   shared: null,          // genes both partners carry (after PSI)
   couple: null,          // risk engine output for the couple
@@ -402,55 +437,90 @@ function planInput() {
 }
 
 // ------------------------------------------------------------------ 5. counsellor hand-off
-function renderCounsel() {
+async function renderCounsel() {
   const label = (r) => t().reasonLabel[r] || r;
-  const mine = S.findings.filter((f) => f.finding.escalation !== "none").map((f) => `${f.variant.gene}: ${label(f.finding.reason)}`);
+  const mine = S.findings.filter((f) => f.finding.escalation !== "none");
   const required = S.couple?.risks.length || S.findings.some((f) => f.finding.escalation === "required");
+  if (S.referral) return renderTracking();
+  S.services = S.services || await api("/api/services").catch(() => []);
+  const fam = treeSummary(S.tree, "en");
   $("counsel").innerHTML = `
     <p class="${required ? "flag" : ""}">${required ? t().recRequired : t().recOptional}</p>
+    <p><strong>${t().svcTitle}</strong></p><p class="small">${esc(t().svcNote)}</p>
+    <div class="options">${S.services.map((v, i) => `<label class="card opt ${i === 0 ? "on" : ""}">
+      <input type="radio" name="svc" value="${v.id}" ${i === 0 ? "checked" : ""}><h3>${esc(v.name)}</h3>
+      <div class="small">${esc(v.mode)} · ${esc(v.languages)}</div><div class="small">${esc(v.wait)}</div></label>`).join("")}</div>
+    <p><strong>${t().pregQ}</strong></p>
+    <div class="row">${[["no", t().pregNo], ["yes", t().pregYes], ["", t().pregSkip]].map(([v, l]) =>
+      `<label><input type="radio" name="preg" value="${v}" ${v === "" ? "checked" : ""}> ${l}</label>`).join("")}</div>
+    <p class="small">${esc(t().pregNote)}</p>
     <p><strong>${t().feeling}</strong></p>
     <div class="row">${t().feelings.map((f, i) => `<label><input type="radio" name="feel" value="${i}"> ${f}</label>`).join("")}</div>
-    <p><strong>${t().shareWhat}</strong></p>
+    <p><strong>${t().incTitle}</strong></p>
     ${S.shared?.length ? `<label><input type="checkbox" id="sh-shared" checked> ${t().shareShared}: ${esc(S.shared.join(", "))}</label>` : ""}
-    ${mine.length ? `<label><input type="checkbox" id="sh-mine" checked> ${t().shareMine}: ${esc(mine.join("; "))}</label>` : ""}
-    <label><input type="checkbox" id="sh-quiz"> ${t().shareQuiz}</label>
-    <label>${t().contact}<input type="text" id="sh-contact"></label>
-    <label>${t().note}<input type="text" id="sh-note"></label>
-    <p class="small">${t().preview}</p><div class="card small" id="sh-preview"></div>
-    <button id="sh-send">${t().send}</button><div id="sh-out"></div>`;
-  const build = () => {
-    const feel = document.querySelector("input[name=feel]:checked")?.value;
-    const reasons = [];
-    if ($("sh-mine")?.checked) reasons.push(...S.findings.filter((f) => f.finding.escalation !== "none").map((f) => `${f.variant.gene}:${f.finding.reason}`));
-    if (feel === "2") reasons.push("feels worried");
-    return { shared_genes: $("sh-shared")?.checked ? S.shared : [], other_reasons: reasons, language: S.lang,
-             quiz_score: $("sh-quiz").checked ? S.quizScore : null, contact: $("sh-contact").value, note: $("sh-note").value };
+    ${mine.length ? `<label><input type="checkbox" id="sh-mine" checked> ${t().shareMine}: ${esc(mine.map((f) => `${f.variant.gene}: ${label(f.finding.reason)}`).join("; "))}</label>` : ""}
+    <label><input type="checkbox" id="sh-quiz" ${S.quizScore === null ? "disabled" : "checked"}> ${t().incQuiz}</label>
+    ${S.opts.picks.length ? `<label><input type="checkbox" id="sh-opts" checked> ${t().incOpts}</label>` : ""}
+    ${fam ? `<label><input type="checkbox" id="sh-fam" checked> ${t().incFamily}: ${esc(fam)}</label>` : ""}
+    <label>${t().contact}<input type="text" id="sh-contact" maxlength="120"></label>
+    <label>${t().note}<input type="text" id="sh-note" maxlength="500"></label>
+    <p class="small">${esc(t().privateFields)}</p>
+    <button id="sh-prep">${t().prepare}</button>
+    <div id="sh-preview"></div><div id="sh-out"></div>`;
+  document.querySelectorAll("input[name=svc]").forEach((r) => (r.onchange = () =>
+    document.querySelectorAll("input[name=svc]").forEach((x) => x.closest(".opt").classList.toggle("on", x.checked))));
+  const input = () => {
+    const on = (id) => $(id)?.checked;
+    return {
+      shared_genes: on("sh-shared") ? S.shared : [],
+      findings: on("sh-mine") ? mine.map((f) => ({ gene: f.variant.gene, classification: f.variant.classification, reason: f.finding.reason })) : [],
+      quiz_score: on("sh-quiz") ? S.quizScore : null, missed: on("sh-quiz") ? S.missed : [],
+      feeling: document.querySelector("input[name=feel]:checked")?.value || "",
+      picks: on("sh-opts") ? S.opts.picks : [], family: on("sh-fam") && fam ? [fam] : [],
+      pregnant: document.querySelector("input[name=preg]:checked")?.value || "", language: S.lang,
+    };
   };
-  // Show the same data that is sent, in plain words (the server receives short codes).
-  const summary = (b) => {
-    const mineSent = b.other_reasons.filter((r) => r.includes(":")).map((r) => {
-      const [gene, code] = r.split(":"); return `${gene}: ${label(code)}`; });
-    const worried = b.other_reasons.includes("feels worried");
-    const quiz = b.quiz_score === null ? ($("sh-quiz").checked ? t().sumNotDone : t().sumNotShared) : t().sumQuizVal(b.quiz_score);
-    const rows = [
-      b.shared_genes.length && [t().sumShared, b.shared_genes.join(", ")],
-      mineSent.length && [t().sumMine, mineSent.join("; ")],
-      worried && [t().sumFeel, t().feelings[2]],
-      [t().sumQuiz, quiz],
-      [t().sumLang, b.language === "ar" ? "العربية" : "English"],
-      [t().sumContact, b.contact || "—"],
-      [t().sumNote, b.note || "—"],
-    ].filter(Boolean);
-    return `<table class="imp">${rows.map(([k, v]) => `<tr><th>${esc(k)}</th><td>${esc(v)}</td></tr>`).join("")}</table>
-      <div>${esc(t().sumNoName)}</div>`;
+  // Anything changed after preparing: the summary must be prepared again before sending.
+  $("counsel").oninput = (e) => { if (!["sh-contact", "sh-note"].includes(e.target.id)) $("sh-preview").innerHTML = ""; };
+  $("sh-prep").onclick = async () => {
+    $("sh-prep").disabled = true;
+    $("sh-preview").innerHTML = `<p class="small">${t().preparing}</p>`;
+    const brief = await api("/api/brief", input()).catch(() => null);
+    $("sh-prep").disabled = false;
+    if (!brief) { $("sh-preview").innerHTML = `<p class="flag">${t().impError}</p>`; return; }
+    $("sh-preview").innerHTML = `<p><strong>${t().briefTitle}</strong></p><p class="small">${esc(t().briefNote)}</p>
+      <div class="card">${renderBrief(brief, { contact: $("sh-contact").value, note: $("sh-note").value })}</div>
+      <button id="sh-send">${t().sendSealed}</button>`;
+    $("sh-send").onclick = async () => {
+      $("sh-send").disabled = true; $("sh-send").textContent = t().sealing;
+      const devices = await api("/api/counsellor/devices").catch(() => []);
+      if (!devices.length) {
+        $("sh-out").innerHTML = `<p class="flag">${esc(t().noDevice)}</p>`;
+        $("sh-send").disabled = false; $("sh-send").textContent = t().sendSealed; return;
+      }
+      // Sealed on this phone: brief + contact + message. The server receives ciphertext only.
+      const sealed = await seal({ brief, contact: $("sh-contact").value, note: $("sh-note").value }, devices);
+      const service = document.querySelector("input[name=svc]:checked")?.value || "clinic";
+      const res = await api("/api/cases", { service, priority: brief.priority, sealed });
+      S.referral = { id: res.id, token: res.token };
+      renderTracking();
+    };
   };
-  const refresh = () => ($("sh-preview").innerHTML = summary(build()));
-  $("counsel").oninput = refresh; $("counsel").onchange = refresh; refresh();
-  $("sh-send").onclick = async () => {
-    const { id } = await api("/api/cases", build());
-    $("sh-out").innerHTML = `<p class="ok">${esc(t().sent(id))}</p>`;
-    $("sh-send").disabled = true;
-  };
+}
+
+// Follow the referral with the private token this phone received (nobody else can see it).
+async function renderTracking() {
+  const r = await fetch(`/api/cases/${S.referral.id}/status`, { headers: { "X-Case-Token": S.referral.token } })
+    .then((x) => (x.ok ? x.json() : null)).catch(() => null);
+  if (!r) return;
+  const order = ["new", "seen", "contacted", "appointment_offered"];
+  const at = order.indexOf(r.status);
+  $("counsel").innerHTML = `<div class="card"><p><strong>${esc(t().trackTitle(r.id, r.service))}</strong>
+      ${r.priority === "urgent" ? `<span class="badge urgent">!</span>` : ""}</p>
+    <ol class="track">${order.map((k, i) => `<li class="${i <= at ? "done" : ""}">${t().st[k]}</li>`).join("")}</ol>
+    <p class="small">${esc(t().trackNote)}</p></div>`;
+  clearTimeout(S._track);
+  S._track = setTimeout(() => { if (S.referral) renderTracking(); }, 4000);
 }
 
 // ------------------------------------------------------------------ 6. help my family (cascade invites)
@@ -518,17 +588,26 @@ function applyLang() {
 function renderImport() {
   $("findings").innerHTML = `<h3>${t().impTitle}</h3><p>${esc(t().impIntro)}</p>
     <p class="small">${esc(t().impPrivacy)}</p>
-    <label class="btn">${t().impChoose}<input type="file" id="pdf" accept="application/pdf,.pdf" hidden></label>
+    <label class="btn">${t().impChoose}<input type="file" id="pdf" accept="application/pdf,.pdf,application/json,.json" hidden></label>
     <p class="small">${t().impNoReport} ${["amina", "khalid", "sara", "omar"].map((p) =>
-      `<a href="/samples/${p}_report.pdf" download>${p[0].toUpperCase() + p.slice(1)}</a>`).join(" · ")}</p>
+      `<a href="/samples/${p}_report.pdf" download>${p[0].toUpperCase() + p.slice(1)}</a>`).join(" · ")}
+      <br>${t().impFhirTry} ${["amina", "khalid", "sara", "omar"].map((p) =>
+      `<a href="/samples/${p}_report.fhir.json" download>${p[0].toUpperCase() + p.slice(1)}</a>`).join(" · ")}</p>
     <div id="import-out"></div>`;
   $("pdf").onchange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
     $("import-out").innerHTML = `<p>${t().impReading}</p>`;
     try {
-      const [text, panel] = await Promise.all([pdfToText(file), api("/api/panel")]);
-      S.imported = parseReportText(text, panel.genes);
+      const isJson = /\.json$/i.test(file.name) || file.type === "application/json";
+      const panel = await api("/api/panel");
+      if (isJson) {
+        const json = JSON.parse(await file.text());
+        if (!isFhir(json)) throw new Error("not FHIR");
+        S.imported = parseFhir(json, panel.genes);
+      } else {
+        S.imported = { ...parseReportText(await pdfToText(file), panel.genes), format: "PDF" };
+      }
       renderConfirm();
     } catch (err) {
       console.error(err);
@@ -548,7 +627,8 @@ function renderConfirm() {
     <td><strong>${esc(f.gene)}</strong></td><td>${esc(f.variant || "—")}</td><td>${esc(f.classification)}</td></tr>`).join("");
   $("import-out").innerHTML = `<div class="card">
     <p><strong>${esc(t().impCheck)}</strong></p>
-    <p class="small">${t().impLab}: ${esc(r.lab || "—")}${r.name ? ` · ${t().impName}: ${esc(r.name)}` : ""}</p>
+    <p class="small">${t().impLab}: ${esc(r.lab || "—")}${r.name ? ` · ${t().impName}: ${esc(r.name)}` : ""}
+      ${r.format ? ` · ${t().impFormat}: <span class="badge">${esc(r.format)}</span>` : ""}</p>
     <label>${t().impSex}: <select id="imp-sex"><option value="">${t().impPickSex}</option>
       <option value="F" ${r.sex === "F" ? "selected" : ""}>${t().impFemale}</option>
       <option value="M" ${r.sex === "M" ? "selected" : ""}>${t().impMale}</option></select></label>

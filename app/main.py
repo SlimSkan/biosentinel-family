@@ -24,9 +24,9 @@ from fastapi.staticfiles import StaticFiles
 import httpx
 from pydantic import BaseModel, Field
 
-from . import explainer, knowledge, llm, risk_engine, tutor
+from . import brief, explainer, knowledge, llm, risk_engine, tutor
 
-app = FastAPI(title="BioSentinel Family", version="0.2.0")
+app = FastAPI(title="BioSentinel Family", version="0.3.0")
 WEB = Path(__file__).resolve().parent.parent / "web"
 
 MAX_ITEMS = 64          # sanity limit on a PSI list
@@ -303,32 +303,148 @@ def invite_status(iid: str, x_invite_owner: str = Header("")):
     return {"opened": inv["opened"], "next_step": inv["next_step"]}
 
 
-# ---------------------------------------------------------------- counsellor
+# ---------------------------------------------------------------- counsellor referral
+# Referral pathway: the person picks a certified counselling service, the phone builds an
+# explainable brief (/api/brief), ENCRYPTS it for the counsellor's devices (web/seal.js) and
+# sends only ciphertext. The person keeps a private token to follow the status.
 CASES: list[dict] = []
+DEVICES: list[dict] = []          # counsellor devices: public keys only (private keys stay in their browser)
+MAX_DEVICES = 20
+STATUSES = ("new", "seen", "contacted", "appointment_offered", "closed")
+SERVICES = [   # demo listings: fictional services, clearly labelled
+    {"id": "clinic", "name": "Demo Genetic Counselling Clinic", "mode": "In person or video",
+     "languages": "Arabic, English", "wait": "Usually within 2 weeks", "certified": True},
+    {"id": "tele", "name": "Demo Tele-genetics Service", "mode": "Video",
+     "languages": "Arabic, English, Urdu", "wait": "Usually within 1 week", "certified": True},
+    {"id": "hospital", "name": "Demo Hospital Genetics Department", "mode": "In person",
+     "languages": "Arabic, English", "wait": "Usually within 3 weeks", "certified": True},
+]
+
+
+def _counsellor(key: str):
+    if COUNSELLOR_KEY and not secrets.compare_digest(key, COUNSELLOR_KEY):
+        raise HTTPException(401, "counsellor key required")
+
+
+@app.get("/api/services")
+def list_services():
+    return SERVICES
+
+
+class BriefIn(BaseModel):
+    shared_genes: list[str] = Field(default_factory=list, max_length=12)
+    findings: list[dict] = Field(default_factory=list, max_length=12)
+    quiz_score: int | None = None
+    missed: list[str] = Field(default_factory=list, max_length=3)
+    feeling: str = Field("", max_length=2)
+    picks: list[str] = Field(default_factory=list, max_length=6)
+    family: list[str] = Field(default_factory=list, max_length=5)
+    pregnant: str = Field("", pattern="^(yes|no|)$")
+    language: str = Field("en", pattern="^(en|ar)$")
+
+
+@app.post("/api/brief")
+def make_brief(req: BriefIn):
+    """Build the pre-consultation brief. De-identified input (no name, no contact); nothing stored."""
+    clean = [{"gene": str(f.get("gene", ""))[:12], "classification": str(f.get("classification", ""))[:40],
+              "reason": str(f.get("reason", ""))[:24]} for f in req.findings]
+    return brief.build(req.model_dump() | {"findings": clean})
+
+
+class Device(BaseModel):
+    kid: str = Field(pattern="^[0-9a-f]{16}$")
+    jwk: dict
+
+
+@app.post("/api/counsellor/devices")
+def register_device(d: Device, x_counsellor_key: str = Header("")):
+    """A counsellor's browser registers its PUBLIC key, so new cases are sealed for it."""
+    _counsellor(x_counsellor_key)
+    jwk = {k: str(d.jwk.get(k, "")) for k in ("kty", "crv", "x", "y")}
+    if jwk["kty"] != "EC" or jwk["crv"] != "P-256" or not jwk["x"] or not jwk["y"]:
+        raise HTTPException(400, "expected an EC P-256 public key")
+    if not any(x["kid"] == d.kid for x in DEVICES):
+        DEVICES.append({"kid": d.kid, "jwk": jwk, "added": time.strftime("%Y-%m-%d %H:%M")})
+        del DEVICES[:-MAX_DEVICES]
+    return {"ok": True, "devices": len(DEVICES)}
+
+
+@app.get("/api/counsellor/devices")
+def list_devices():
+    """Public keys only: anyone may encrypt for the counsellors; only they can decrypt."""
+    return [{"kid": d["kid"], "jwk": d["jwk"]} for d in DEVICES]
+
+
+class Sealed(BaseModel):
+    v: int
+    alg: str = Field(max_length=64)
+    epk: dict
+    iv: str = Field(max_length=64)
+    ct: str = Field(max_length=200_000)
+    keys: list[dict] = Field(max_length=MAX_DEVICES)
 
 
 class Case(BaseModel):
+    service: str = Field("clinic", max_length=20)
+    priority: str = Field("routine", pattern="^(routine|urgent)$")   # routing only: "urgent" = current pregnancy
+    sealed: Sealed | None = None
+    # older, unencrypted form (kept for the family-invite page and old clients)
     shared_genes: list[str] = []
-    other_reasons: list[str] = []          # e.g. "vus", "xl_carrier_female", "worried"
+    other_reasons: list[str] = []
     language: str = "en"
     quiz_score: int | None = None
-    contact: str = Field("", max_length=120)   # what the couple chose to share
+    contact: str = Field("", max_length=120)
     note: str = Field("", max_length=500)
 
 
 @app.post("/api/cases")
 def create_case(case: Case):
+    token = secrets.token_urlsafe(16)
     item = case.model_dump() | {"id": len(CASES) + 1, "received": time.strftime("%Y-%m-%d %H:%M"),
-                                "status": "new"}
+                                "status": "new", "updated": time.strftime("%Y-%m-%d %H:%M"),
+                                "_token": token}
+    if case.sealed:      # drop the empty plaintext fields: the server keeps ciphertext only
+        for k in ("shared_genes", "other_reasons", "quiz_score", "contact", "note"):
+            item.pop(k, None)
     CASES.append(item)
-    return {"id": item["id"]}
+    return {"id": item["id"], "token": token}
 
 
 @app.get("/api/cases")
 def list_cases(x_counsellor_key: str = Header("")):
-    if COUNSELLOR_KEY and not secrets.compare_digest(x_counsellor_key, COUNSELLOR_KEY):
-        raise HTTPException(401, "counsellor key required")
-    return list(reversed(CASES))
+    _counsellor(x_counsellor_key)
+    return [{k: v for k, v in c.items() if k != "_token"} for c in reversed(CASES)]
+
+
+def _case(cid: int) -> dict:
+    for c in CASES:
+        if c["id"] == cid:
+            return c
+    raise HTTPException(404, "case not found")
+
+
+class StatusIn(BaseModel):
+    status: str
+
+
+@app.post("/api/cases/{cid}/status")
+def set_status(cid: int, body: StatusIn, x_counsellor_key: str = Header("")):
+    _counsellor(x_counsellor_key)
+    if body.status not in STATUSES:
+        raise HTTPException(400, "unknown status")
+    c = _case(cid)
+    c["status"], c["updated"] = body.status, time.strftime("%Y-%m-%d %H:%M")
+    return {"ok": True}
+
+
+@app.get("/api/cases/{cid}/status")
+def case_status(cid: int, x_case_token: str = Header("")):
+    """The person follows their own referral with the token their phone received."""
+    c = _case(cid)
+    if not secrets.compare_digest(x_case_token, c["_token"]):
+        raise HTTPException(403, "wrong token")
+    svc = next((x["name"] for x in SERVICES if x["id"] == c.get("service")), "")
+    return {"id": cid, "status": c["status"], "updated": c["updated"], "service": svc, "priority": c["priority"]}
 
 
 # ---------------------------------------------------------------- web app

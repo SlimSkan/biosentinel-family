@@ -502,3 +502,186 @@ def test_without_a_key_the_app_uses_local_ollama(monkeypatch):
     monkeypatch.setattr(llm, "GEMINI_KEY", "")
     monkeypatch.delenv("BSF_LLM", raising=False)
     assert llm.provider() == "ollama"
+
+
+# ------------------------------------------------------------------ helpers for the new features
+def _node(script: str) -> str:
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node not installed")
+    return subprocess.run([node, "--input-type=module", "-e", script], capture_output=True, text=True,
+                          check=True).stdout
+
+
+def _fake_llm(monkeypatch, text):
+    from app import llm
+    monkeypatch.setattr(llm, "ask", lambda *a, **k: text)
+
+
+# ------------------------------------------------------------------ family-tree carrier map
+def test_family_map_halves_with_each_step_of_relationship():
+    m = {n["id"]: n["pct"] for n in risk_engine.family_map("HBB")["nodes"]}
+    assert m["me"] == 100 and m["mother"] == m["father"] == m["brother"] == m["son"] == 50
+    assert m["pgm"] == m["m_aunt"] == m["nephew"] == 25
+    assert m["p_cousin"] == m["m_cousin"] == 12.5
+
+
+def test_family_map_side_of_origin_when_a_parent_is_tested():
+    m = {n["id"]: n["pct"] for n in risk_engine.family_map("HBB", {"mother": "not_carrier"})["nodes"]}
+    assert m["father"] == 100 and m["p_uncle"] == 50 and m["p_cousin"] == 25      # father's side doubles
+    assert m["mother"] == m["mgm"] == m["m_aunt"] == m["m_cousin"] == 0           # not from the mother's side
+    m = {n["id"]: n["pct"] for n in risk_engine.family_map("HBB", {"brother": "carrier"})["nodes"]}
+    assert m["brother"] == 100 and m["nephew"] == 50 and m["niece"] == 25
+
+
+def test_family_map_x_linked_gives_children_only_and_ignores_unknown_ids():
+    nodes = risk_engine.family_map("G6PD", {"hacker": "carrier", "me": "not_carrier"})["nodes"]
+    m = {n["id"]: n["pct"] for n in nodes}
+    assert m["son"] == m["daughter"] == 50 and m["me"] == 100 and m["m_aunt"] is None
+    assert TestClient(app).post("/api/family-map", json={"gene": "NOPE"}).status_code == 400
+
+
+# ------------------------------------------------------------------ adaptive teaching and questions
+def test_teachback_without_ai_returns_the_reviewed_text():
+    r = TestClient(app).post("/api/teachback", json={"concept": "carrier", "lang": "ar", "ai": False}).json()
+    assert r["source"] == "template" and "بصحة" in r["text"]
+
+
+def test_teachback_rejects_an_unsafe_rewrite(monkeypatch):
+    from app import tutor
+    _fake_llm(monkeypatch, "You have the disease, so you should not marry.")
+    r = tutor.reexplain("carrier", "I have the disease", "Being a carrier means...")
+    assert r["source"] == "template" and r["problems"]
+
+
+def test_answer_keeps_cited_sentences_and_lists_the_sources(monkeypatch):
+    from app import tutor
+    _fake_llm(monkeypatch, "A carrier is healthy and has one changed copy of a gene. [F3] "
+                           "This app gives educational information. [F8]")
+    r = tutor.answer("Am I ill?", [{"gene": "HBB", "classification": "Pathogenic"}], [])
+    assert r["source"] == "ai" and "[F" not in r["text"]
+    assert [s["id"] for s in r["sources"]] == ["F3", "F8"]
+
+
+@pytest.mark.parametrize("reply", [
+    "A carrier is healthy and has one changed copy of a gene.",                 # no citation
+    "A carrier is healthy. [F99]",                                              # cites a fact that does not exist
+    "There is a 30% chance your child is affected. [F3]",                       # number not in the facts
+    "You should not marry each other. [F3]",                                    # directive
+    "NO_ANSWER",                                                                # model declined
+])
+def test_answer_falls_back_to_the_referral_text(monkeypatch, reply):
+    from app import tutor
+    _fake_llm(monkeypatch, reply)
+    r = tutor.answer("Should we marry?", [{"gene": "HBB", "classification": "Pathogenic"}], [])
+    assert r["source"] == "template" and "counsellor" in r["text"] and r["sources"] == []
+
+
+def test_ask_endpoint_limits_the_question_and_ignores_unknown_genes(monkeypatch):
+    c = TestClient(app)
+    assert c.post("/api/ask", json={"question": "x" * 301}).status_code == 422
+    _fake_llm(monkeypatch, "NO_ANSWER")
+    assert c.post("/api/ask", json={"question": "What is this?", "shared": ["EVIL"]}).json()["source"] == "template"
+
+
+# ------------------------------------------------------------------ pre-consultation brief
+def test_brief_is_built_from_rules_and_the_summary_cites_facts(monkeypatch):
+    from app import brief
+    _fake_llm(monkeypatch, "Both partners carry a pathogenic change in HBB. [F1] They want to discuss PGT-M. [F3]")
+    b = brief.build({"shared_genes": ["HBB"], "findings": [], "quiz_score": 2, "missed": ["carrier"],
+                     "picks": ["pgt"], "pregnant": "yes"})
+    assert b["priority"] == "urgent" and b["agenda"][0].startswith("Current pregnancy")
+    assert "25% affected" in b["risks"][0] and "what being a carrier means" in b["understanding"]
+    assert b["summary_source"] == "ai" and b["summary_sources"] == ["F1", "F3"]
+
+
+def test_brief_falls_back_to_rules_when_the_summary_is_not_cited(monkeypatch):
+    from app import brief
+    _fake_llm(monkeypatch, "They are fine and should go ahead.")
+    b = brief.build({"shared_genes": ["HBB"]})
+    assert b["summary_source"] == "rules" and b["summary"].startswith("Referral for")
+
+
+# ------------------------------------------------------------------ encrypted referral and tracking
+def test_sealed_cases_store_no_plaintext_and_need_the_token_to_follow():
+    from app import main
+    c = TestClient(app)
+    sealed = {"v": 1, "alg": "ECDH-P256+HKDF-SHA256+A256GCM", "epk": {"kty": "EC"}, "iv": "aa", "ct": "bb",
+              "keys": [{"kid": "0123456789abcdef", "iv": "cc", "wk": "dd"}]}
+    r = c.post("/api/cases", json={"service": "tele", "priority": "urgent", "sealed": sealed,
+                                   "contact": "should be dropped"}).json()
+    stored = next(x for x in main.CASES if x["id"] == r["id"])
+    assert "contact" not in stored and stored["sealed"]["ct"] == "bb"
+    assert c.get(f"/api/cases/{r['id']}/status", headers={"X-Case-Token": "wrong"}).status_code == 403
+    s = c.get(f"/api/cases/{r['id']}/status", headers={"X-Case-Token": r["token"]}).json()
+    assert s["status"] == "new" and s["priority"] == "urgent" and "Tele" in s["service"]
+    assert all("_token" not in x for x in c.get("/api/cases").json())          # never in the counsellor list
+
+
+def test_counsellor_devices_and_status_need_the_key(monkeypatch):
+    from app import main
+    monkeypatch.setattr(main, "COUNSELLOR_KEY", "k3y")
+    c = TestClient(app)
+    dev = {"kid": "00112233aabbccdd", "jwk": {"kty": "EC", "crv": "P-256", "x": "AAA", "y": "BBB", "d": "SECRET"}}
+    assert c.post("/api/counsellor/devices", json=dev).status_code == 401
+    assert c.post("/api/counsellor/devices", json=dev, headers={"X-Counsellor-Key": "k3y"}).status_code == 200
+    listed = c.get("/api/counsellor/devices").json()
+    assert {"kid": "00112233aabbccdd", "jwk": {"kty": "EC", "crv": "P-256", "x": "AAA", "y": "BBB"}} in listed
+    assert "SECRET" not in json.dumps(listed)                                     # a private part is never kept
+    cid = c.post("/api/cases", json={"note": "x"}).json()["id"]
+    assert c.post(f"/api/cases/{cid}/status", json={"status": "seen"}).status_code == 401
+    assert c.post(f"/api/cases/{cid}/status", json={"status": "bogus"}, headers={"X-Counsellor-Key": "k3y"}).status_code == 400
+    assert c.post(f"/api/cases/{cid}/status", json={"status": "seen"}, headers={"X-Counsellor-Key": "k3y"}).status_code == 200
+
+
+def test_browser_encryption_round_trip_wrong_device_and_tampering():
+    seal = (ROOT / "web" / "seal.js").as_uri()
+    script = (
+        f"import {{newDevice, seal, open}} from '{seal}';"
+        "const a = await newDevice(), b = await newDevice();"
+        "const env = await seal({brief: 'HBB secret'}, [{kid: a.kid, jwk: a.publicJwk}]);"
+        "let wrong = 'opened'; try { await open(env, b); } catch (e) { wrong = 'refused'; }"
+        "const ok = (await open(env, a)).brief;"
+        "const leak = JSON.stringify(env).includes('HBB');"
+        "env.ct = env.ct.slice(0, -4) + 'AAAA';"
+        "let tampered = 'opened'; try { await open(env, a); } catch (e) { tampered = 'refused'; }"
+        "console.log(JSON.stringify({ok, wrong, tampered, leak}));"
+    )
+    assert json.loads(_node(script)) == {"ok": "HBB secret", "wrong": "refused", "tampered": "refused", "leak": False}
+
+
+# ------------------------------------------------------------------ standard lab results (HL7 FHIR)
+def test_fhir_samples_are_read_like_the_lab_reports():
+    parser = (ROOT / "web" / "fhir_parser.js").as_uri()
+    panel = list(knowledge.kb()["genes"])
+    samples = (ROOT / "web" / "samples").as_posix()
+    script = (
+        f"import {{parseFhir}} from '{parser}'; import fs from 'fs';"
+        "const r = {};"
+        "for (const p of ['amina', 'khalid', 'sara', 'omar'])"
+        f"  r[p] = parseFhir(JSON.parse(fs.readFileSync('{samples}/' + p + '_report.fhir.json', 'utf8')), {json.dumps(panel)});"
+        "console.log(JSON.stringify(r));"
+    )
+    r = json.loads(_node(script))
+    personas = json.loads((ROOT / "data" / "personas.json").read_text(encoding="utf-8"))["personas"]
+    for pid, person in personas.items():
+        assert [(f["gene"], f["classification"]) for f in r[pid]["findings"]] == \
+               [(v["gene"], v["classification"]) for v in person["variants"]]
+        assert r[pid]["sex"] == person["sex"] and r[pid]["format"].startswith("HL7 FHIR")
+        assert set(r[pid]["negative"]) == set(panel) - {v["gene"] for v in person["variants"]}
+
+
+def test_fhir_parser_skips_benign_and_flags_genes_outside_the_panel():
+    parser = (ROOT / "web" / "fhir_parser.js").as_uri()
+
+    def obs(gene, sig):
+        return {"resourceType": "Observation", "code": {"coding": [{"code": "69548-6"}]},
+                "valueCodeableConcept": {"coding": [{"code": "LA9633-4"}]},
+                "component": [{"code": {"coding": [{"code": "48018-6"}]}, "valueCodeableConcept": {"coding": [{"display": gene}]}},
+                              {"code": {"coding": [{"code": "53037-8"}]}, "valueCodeableConcept": {"coding": [{"code": sig}]}}]}
+    bundle = {"resourceType": "Bundle", "entry": [{"resource": obs("HBB", "LA6675-8")}, {"resource": obs("BRCA1", "LA6668-3")},
+                                                 {"resource": obs("CFTR", "LA26332-9")}]}
+    r = json.loads(_node(f"import {{parseFhir}} from '{parser}'; "
+                         f"console.log(JSON.stringify(parseFhir({json.dumps(bundle)}, ['HBB','CFTR'])));"))
+    assert r["findings"] == [{"gene": "CFTR", "variant": "", "classification": "Likely pathogenic"}]
+    assert r["notCovered"] == ["BRCA1"]

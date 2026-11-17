@@ -59,3 +59,9 @@ svg.tree .node { cursor: pointer; } svg.tree .lbl { font-size: 12px; fill: #3a30
 svg.tree .side { font-size: 12px; fill: #7a706a; font-weight: 600; }
 .tree-panel { background: #fff; border: 1px solid var(--line); }
 svg.tree .pct { font-size: 12px; font-weight: 700; fill: #1f6f6b; }
+.badge.urgent { background: #b43c2e; color: #fff; border-color: #b43c2e; }
+.brief table.imp th { width: 34%; } .brief ul { margin: 2px 0; padding-inline-start: 18px; } li.cited { font-weight: 600; }
+ol.track { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+ol.track li { padding: 6px 10px; border-radius: 14px; border: 1px solid var(--line); font-size: 13px; color: #7a706a; }
+ol.track li.done { background: #1f6f6b; color: #fff; border-color: #1f6f6b; }
+.edu { background: #fff7e6; border: 1px solid #f0d9a8; color: #6b5313; padding: 8px 12px; border-radius: 8px; font-size: 13px; margin: 8px 0; }

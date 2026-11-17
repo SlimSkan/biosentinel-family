@@ -4,7 +4,7 @@
 // version is used as soon as it is deployed; the saved copy is used only when there is no
 // connection. API calls (/api/...) are never saved: results and matches must always be live,
 // and nothing personal is ever written to the phone's cache.
-const CACHE = "bsf-shell-v2";       // change the number to replace saved copies
+const CACHE = "bsf-shell-v3";       // change the number to replace saved copies
 const SHELL = ["/", "/index.html", "/partner.html", "/invite.html", "/style.css", "/app.js",
                "/invite.js", "/psi.js", "/manifest.json", "/icons/icon-192.png"];
 

@@ -15,14 +15,14 @@ Read it with the code open beside it. Every file is short and commented.
    │ her secret PSI key  ───never sent──   │                                       │ his secret PSI key
    │                                       │                                       │
    │── one gene at a time ──────────────►  explain/finding ─► risk_engine          │
-   │◄── explanation ────────────────────   │                 ─► explainer ─► Gemma 4 (Ollama)
+   │◄── explanation ────────────────────   │                 ─► explainer ─► llm.py ─► Gemma 4 (Gemini API or Ollama)
    │                                       │                 ─► guardrails         │
    │                                       │                                       │
    │── locked values ──────────────────►   PSI relay (mailbox)  ◄── locked values ─│
    │◄─────────────────────────────────     sees only random-looking numbers  ─────►│
    │                                       │                                       │
    │── shared genes only ──────────────►   explain/couple ─► risk_engine (25/50/25)│
-   │── what she chooses to share ──────►   cases  ─────────► counsellor.html       │
+   │── brief, ENCRYPTED on her phone ──►   cases (ciphertext) ─► counsellor.html   │
    │── "invite my family" (one gene) ──►   invites: random id + 2 counters         │
    │                                       │                                       │
                                      Relative's phone: invite.html?i=<random id>
@@ -227,10 +227,11 @@ own icon and full screen, without an app store.
 - The match code can be sent by WhatsApp. The link fills in the code on the partner's phone, but
   the partner must still tick consent and press Join: a link can never join a match by itself.
 
-### `web/counsellor.html` — the counsellor inbox
-Polls `/api/cases` every 3 seconds and shows exactly what each couple chose to send.
+### `web/counsellor.html` — the counsellor console
+Registers this browser as a counsellor device (public key to the server, private key kept here),
+decrypts each case locally, shows the brief, and sets the status the couple sees.
 
-### `tests/test_core.py` — 111 tests
+### `tests/test_core.py` — 145 tests
 They focus on what must never break: the 25/50/25 numbers, X-linked and VUS handling, every
 template passing the guardrails in both languages, every template covering its own key facts
 for every panel gene, a dropped fact or number being caught (the real fava-bean case), unsafe
@@ -238,6 +239,56 @@ texts being rejected, the relative chances (50/25/12.5), the invite API never ex
 sender or storing the relation, the 2048-bit
 prime being correct, PSI finding exactly the shared gene, Python and browser agreeing, and a
 full API run in which the relay never sees a gene name.
+
+---
+
+## 3b. Version 0.3: what changed after the jury's feedback
+
+The review asked for live AI, a family-tree view, standard lab formats, structured options,
+explainable briefs for specialists, strong privacy and a clear referral pathway. Each one:
+
+### Live AI — `app/llm.py`
+One door to Gemma 4. With `GEMINI_API_KEY` set (Render's Environment tab), it calls
+**Gemma 4 hosted by Google** (`gemma-4-26b-a4b-it`, Gemini API); otherwise it calls a local
+Ollama (laptop, Colab, Azure GPU). The key travels in a header, never in a URL. What is sent is
+de-identified: gene, condition, risk numbers, quiz answers. Never a name, contact or full result.
+
+### Adaptive teaching — `app/tutor.py`
+- **Teach-back:** each idea missed in the quick check (carrier, partner, autonomy) is re-explained
+  by Gemma *starting from the reader's own wrong answer*, then checked by the same guardrails.
+- **Ask a question:** Gemma answers only from **numbered facts** about the reader's own results
+  (F1, F2…) and must cite a fact after every sentence. Missing or invented citations, a number
+  not in the facts, or any directive language → the reader gets a safe "ask a counsellor" text.
+  The cited facts are shown under the answer, so every answer is explainable.
+
+### Structured options and next steps — `web/options.js`
+Six options with the same fields (when, what it involves, what it can tell you, things to
+consider, a question for the counsellor). Pick up to three to compare side by side. A next-steps
+checklist is built by rules from the result type (shared gene, X-linked, VUS) and the picks.
+Never ranked, reviewed text only.
+
+### Family-tree carrier map — `risk_engine.family_map()`, `web/familytree.js`
+A pedigree around the person. Each relative shows their chance of carrying the same change.
+Mark a relative as tested and the map updates with real genetics: if the mother tested negative,
+the change came from the father's side (father ~100%, uncle 50%, cousin 25%; mother's side 0%).
+X-linked genes show the son/daughter rule and leave the rest to a counsellor. Relationships only.
+
+### Standard lab results — `web/fhir_parser.js`, `tools/make_sample_fhir.py`
+Reads **HL7 FHIR R4 Genomics Reporting** bundles (LOINC 69548-6 variant observations, gene
+48018-6, HGVS 48004-6/48005-3, clinical significance 53037-8, Present/Absent). Read on the phone,
+never uploaded; the person confirms, exactly like the PDF route.
+
+### Explainable brief, encrypted referral, tracking — `app/brief.py`, `web/seal.js`, `web/brief_view.js`
+1. **Brief:** rules build the structured part (reason, risk figures, understanding, options,
+   relatives tested, suggested agenda). Gemma writes a 3–4 sentence summary for the specialist,
+   with a cited fact per sentence (checked; otherwise a rule-written summary).
+2. **Encryption:** each counsellor device has an ECDH P-256 key pair (private key stays in its
+   browser). The phone encrypts the brief + contact with AES-256-GCM, and wraps that key for each
+   registered device with ECDH + HKDF-SHA-256. **The server stores ciphertext only.**
+3. **Referral pathway:** choice of certified service (demo listings), a time-sensitive flag if the
+   person is pregnant, and a private token to follow the status (sent → seen → contacting →
+   appointment offered), which the counsellor updates from the console.
+4. **Educational, not diagnostic:** a banner on every result screen, and on every brief.
 
 ---
 
@@ -291,10 +342,11 @@ The relay sees only random-looking numbers; it can tell how many matched, but no
 | Limit now | Next step |
 |---|---|
 | Coverage check uses keywords: it proves a topic is *mentioned*, not that the sentence around it is right ("fava beans are safe" would pass coverage) | An AI judge or entailment model comparing each rewrite with the template, plus counsellor review of a sample of real outputs |
-| Explanations call a server-side Gemma (one gene at a time) | On-device model in production; Azure-hosted Gemma for the demo |
-| Report held in page memory, reloaded from the demo lab | Encrypted on-device storage (WebCrypto) and real report import (PDF / FHIR) |
+| Gemma runs on Google's servers (Gemini API) for the online demo; de-identified facts are sent | On-device model in production, or a UAE-hosted Gemma (Azure) |
+| Report held in page memory; PDF and FHIR import are not signature-checked | Lab-signed FHIR results, encrypted on-device storage |
 | PSI set inflation possible | Lab-signed results |
-| Counsellor console has no login | Microsoft Entra ID roles |
+| Counsellor console uses one shared key; device keys live in the browser's storage | Microsoft Entra ID roles; keys in the OS keystore or a hardware token |
+| Family map is a fixed small pedigree; side-of-origin logic for parents and siblings only | Full pedigree editor and Bayesian risk (e.g. with counsellor tools) |
 | In-memory server storage | Azure Database for PostgreSQL in a UAE region, audit log |
 | Arabic written by us | Native-speaker and counsellor review of every template |
 | Family invite: a relative who knows few people were tested may guess the sender | Say so on the sender's screen; let the counsellor send the invite instead |

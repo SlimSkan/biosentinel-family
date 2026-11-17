@@ -16,36 +16,93 @@
   <script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {}); // the app still works without it</script>
 </head>
 <body>
-  <header><h1>Counsellor console (guest, read-only)</h1><a href="/">Home</a></header>
+  <header><h1>Counsellor console</h1><a href="/">Home</a></header>
   <main>
-    <p class="small">You see only what each couple chose to send. No names or full results are stored. Refreshes every 3 seconds.</p>
+    <p class="edu">Educational pre-consultation summaries from screening results. Not a diagnosis: verify against the laboratory report.</p>
+    <div class="card" id="device"></div>
+    <p class="small">Cases are encrypted end to end: the couple's phone seals each case for the registered counsellor
+      devices, and only this browser's private key can open it. The server stores ciphertext only. Refreshes every 4 seconds.</p>
     <div id="cases"></div>
   </main>
-  <script>
+  <script type="module">
+    import { newDevice, open } from "./seal.js";
+    import { renderBrief } from "./brief_view.js";
     const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-    // On the public demo the inbox needs the counsellor key. It is kept for this tab only.
+    const store = { get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
+                    set: (k, v) => { try { localStorage.setItem(k, v); } catch {} } };
     const key = () => { try { return sessionStorage.getItem("bsf-ckey") || ""; } catch { return ""; } };
+    const STATUS = { new: "New", seen: "Seen", contacted: "Contacted", appointment_offered: "Appointment offered", closed: "Closed" };
+    const SERVICES = {};
     const REASON = { vus: "uncertain result (VUS)", xl_carrier_female: "woman carrying an X-linked change (sons may be affected)" };
     const reason = (r) => { const [g, code] = r.split(":"); return code && REASON[code] ? `${g}: ${REASON[code]}` : r; };
-    async function load() {
-      const r = await fetch("/api/cases", { headers: { "X-Counsellor-Key": key() } });
+    const opened = {};      // case id -> decrypted content (in memory only)
+    let device = null;
+
+    async function authed(url, opts = {}) {
+      const r = await fetch(url, { ...opts, headers: { ...(opts.headers || {}), "X-Counsellor-Key": key(), "Content-Type": "application/json" } });
       if (r.status === 401) {
         const k = prompt("Counsellor key");
-        if (k) { try { sessionStorage.setItem("bsf-ckey", k); } catch {} return load(); }
-        document.getElementById("cases").innerHTML = "<p>Counsellor key required.</p>"; return;
+        if (k) { try { sessionStorage.setItem("bsf-ckey", k); } catch {} return authed(url, opts); }
+        throw new Error("key required");
       }
-      const cases = await r.json();
-      document.getElementById("cases").innerHTML = cases.length ? cases.map((c) => `
-        <div class="card">
-          <h3>Case ${c.id} · ${esc(c.received)} · ${esc(c.status)}</h3>
-          ${c.shared_genes.length ? `<div class="flag">Shared carrier gene(s): ${esc(c.shared_genes.join(", "))}</div>` : ""}
-          ${c.other_reasons.length ? `<div>Other reasons: ${esc(c.other_reasons.map(reason).join("; "))}</div>` : ""}
-          <div class="small">Language: ${c.language === "ar" ? "Arabic" : "English"} · Quick-check score: ${c.quiz_score === null ? "not shared" : `${c.quiz_score} of 3`}</div>
-          ${c.contact ? `<div>Contact: ${esc(c.contact)}</div>` : ""}
-          ${c.note ? `<div>Message: ${esc(c.note)}</div>` : ""}
-        </div>`).join("") : "<p>No cases yet.</p>";
+      return r;
     }
-    load().then(() => setInterval(load, 3000));
+
+    // This browser's counsellor device: the private key stays here (localStorage), the public key is registered.
+    async function setupDevice() {
+      const saved = store.get("bsf-counsellor-device");
+      device = saved ? JSON.parse(saved) : await newDevice();
+      store.set("bsf-counsellor-device", JSON.stringify(device));
+      await authed("/api/counsellor/devices", { method: "POST", body: JSON.stringify({ kid: device.kid, jwk: device.publicJwk }) });
+      document.getElementById("device").innerHTML = `<strong>This device is registered.</strong>
+        <span class="small">Device key ${esc(device.kid)} · ECDH P-256. New cases are sealed for it.</span>`;
+    }
+
+    async function setStatus(id, status) {
+      await authed(`/api/cases/${id}/status`, { method: "POST", body: JSON.stringify({ status }) });
+      load();
+    }
+    window.setStatus = setStatus;
+
+    async function caseBody(c) {
+      if (!c.sealed) {         // older, unencrypted form (family-invite requests)
+        return `${c.shared_genes?.length ? `<div class="flag">Shared carrier gene(s): ${esc(c.shared_genes.join(", "))}</div>` : ""}
+          ${c.other_reasons?.length ? `<div>Other reasons: ${esc(c.other_reasons.map(reason).join("; "))}</div>` : ""}
+          ${c.contact ? `<div>Contact: ${esc(c.contact)}</div>` : ""}${c.note ? `<div>Message: ${esc(c.note)}</div>` : ""}
+          <div class="small">Not encrypted (sent from a family-invite page).</div>`;
+      }
+      if (!opened[c.id]) {
+        try { opened[c.id] = await open(c.sealed, device); }
+        catch { return `<p class="small">Sealed for another counsellor device: it cannot be opened here. (This is end-to-end encryption at work.)</p>`; }
+      }
+      const d = opened[c.id];
+      return `<span class="badge">Decrypted on this device</span>` + renderBrief(d.brief, { contact: d.contact, note: d.note });
+    }
+
+    async function load() {
+      const cases = await (await authed("/api/cases")).json();
+      const html = await Promise.all(cases.map(async (c) => `
+        <div class="card">
+          <h3>Case ${c.id} · ${esc(c.received)} · ${esc(SERVICES[c.service] || c.service || "")}
+            ${c.priority === "urgent" ? `<span class="badge urgent">Time-sensitive</span>` : ""}</h3>
+          <div class="row small">Status: <strong>${STATUS[c.status] || esc(c.status)}</strong>
+            ${["seen", "contacted", "appointment_offered", "closed"].map((s) =>
+              `<button class="secondary" onclick="setStatus(${c.id}, '${s}')" ${c.status === s ? "disabled" : ""}>${STATUS[s]}</button>`).join("")}</div>
+          ${await caseBody(c)}
+        </div>`));
+      document.getElementById("cases").innerHTML = html.join("") || "<p>No cases yet.</p>";
+    }
+
+    (async () => {
+      try {
+        (await fetch("/api/services").then((r) => r.json())).forEach((s) => (SERVICES[s.id] = s.name));
+        await setupDevice();
+        await load();
+        setInterval(() => load().catch(() => {}), 4000);
+      } catch (e) {
+        document.getElementById("cases").innerHTML = "<p>Counsellor key required.</p>";
+      }
+    })();
   </script>
 </body>
 </html>
