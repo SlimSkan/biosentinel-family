@@ -38,13 +38,16 @@ COUNSELLOR_KEY = os.environ.get("BSF_COUNSELLOR_KEY", "")
 
 # ---------------------------------------------------------------- health
 @app.get("/api/health")
-def health():
+def health(probe: int = 0):
     """Is the server up, and can it reach Gemma? Use it to warm the AI before a demo.
 
     Note: on Azure, calling this also wakes the Gemma container if it was scaled to zero.
     """
     ai = llm.status()
-    return {"ok": True, "version": app.version, "provider": llm.provider(), "model": llm.model_name(), "ai": ai}
+    out = {"ok": True, "version": app.version, "provider": llm.provider(), "model": llm.model_name(), "ai": ai}
+    if probe:
+        out["probe"] = llm.probe()
+    return out
 
 
 # ---------------------------------------------------------------- lab (demo)

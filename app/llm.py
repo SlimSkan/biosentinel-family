@@ -36,13 +36,10 @@ def ask(system: str, user: str, max_tokens: int = 700) -> str:
     """Send one prompt, return the model's text. Raises on any network or API error
     (the callers then fall back to reviewed text)."""
     if provider() == "gemini":
-        # Gemma models on the Gemini API take the instructions inside the user turn.
-        r = httpx.post(f"{GEMINI_URL}/{GEMINI_MODEL}:generateContent", timeout=TIMEOUT_S,
-                       headers={"x-goog-api-key": GEMINI_KEY},
-                       json={"contents": [{"role": "user", "parts": [{"text": f"{system}\n\n{user}"}]}],
-                             "generationConfig": {"temperature": 0.2, "maxOutputTokens": max_tokens}})
-        r.raise_for_status()
-        parts = r.json()["candidates"][0]["content"]["parts"]
+        data = _gemini(f"{system}
+
+{user}", max_tokens)
+        parts = data["candidates"][0].get("content", {}).get("parts", [])
         return "".join(p.get("text", "") for p in parts if not p.get("thought"))
     r = httpx.post(f"{OLLAMA_URL}/api/chat", timeout=TIMEOUT_S, json={
         "model": OLLAMA_MODEL, "stream": False, "think": False,
@@ -51,6 +48,33 @@ def ask(system: str, user: str, max_tokens: int = 700) -> str:
     })
     r.raise_for_status()
     return r.json()["message"]["content"]
+
+
+def _gemini(prompt: str, max_tokens: int) -> dict:
+    """Gemma 4 on the Gemini API. Gemma takes the instructions inside the user turn.
+    Gemma 4 may reason before answering, and that reasoning uses output tokens too, so the
+    budget is generous; the reasoning parts ("thought") are never shown."""
+    r = httpx.post(f"{GEMINI_URL}/{GEMINI_MODEL}:generateContent", timeout=TIMEOUT_S,
+                   headers={"x-goog-api-key": GEMINI_KEY},
+                   json={"contents": [{"role": "user", "parts": [{"text": prompt}]}],
+                         "generationConfig": {"temperature": 0.2, "maxOutputTokens": max(4096, max_tokens * 4)}})
+    r.raise_for_status()
+    return r.json()
+
+
+def probe() -> dict:
+    """Shape of one tiny Gemini reply (finish reason, part kinds and lengths, token use).
+    No content and no key: safe to show for diagnosis."""
+    if provider() != "gemini":
+        return {"provider": provider()}
+    try:
+        d = _gemini("Reply with the single word: OK", 50)
+        c = d["candidates"][0]
+        return {"finish": c.get("finishReason"), "usage": d.get("usageMetadata", {}),
+                "parts": [{"thought": bool(p.get("thought")), "chars": len(p.get("text", ""))}
+                          for p in c.get("content", {}).get("parts", [])]}
+    except Exception as e:
+        return {"error": type(e).__name__, "detail": str(getattr(e, "response", "") and e.response.status_code)}
 
 
 def status() -> dict:
