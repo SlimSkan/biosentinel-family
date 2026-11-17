@@ -56,7 +56,9 @@ def _gemini(prompt: str, max_tokens: int) -> dict:
                    headers={"x-goog-api-key": GEMINI_KEY},
                    json={"contents": [{"role": "user", "parts": [{"text": prompt}]}],
                          "generationConfig": {"temperature": 0.2, "maxOutputTokens": max(4096, max_tokens * 4)}})
-    r.raise_for_status()
+    if r.status_code >= 400:     # say which error (e.g. 429 = free-tier rate limit); Google's message has no key
+        msg = r.json().get("error", {}).get("message", "") if "json" in r.headers.get("content-type", "") else ""
+        raise RuntimeError(f"Gemini HTTP {r.status_code}: {msg[:120]}")
     return r.json()
 
 

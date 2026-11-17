@@ -70,7 +70,7 @@ def reexplain(concept: str, wrong_answer: str, question: str, lang: str = "en", 
     try:
         text = explainer._clean(llm.ask(system, user, max_tokens=400))
     except Exception as e:
-        return {"text": base, "source": "template", "problems": [f"ai unavailable: {type(e).__name__}"]}
+        return {"text": base, "source": "template", "problems": [f"ai unavailable: {type(e).__name__}: {str(e)[:140]}"]}
     problems = guardrails.check(text, {0, 100}, facts=c["facts"], lang=lang)
     if problems:
         return {"text": base, "source": "template", "problems": problems}
@@ -150,7 +150,7 @@ def answer(question: str, findings: list[dict], shared: list[str], lang: str = "
     try:
         raw = llm.ask(system, f"FACTS:\n{numbered}\n\nQUESTION: {question}", max_tokens=400)
     except Exception as e:
-        return refusal | {"problems": [f"ai unavailable: {type(e).__name__}"]}
+        return refusal | {"problems": [f"ai unavailable: {type(e).__name__}: {str(e)[:140]}"]}
     raw = re.sub(r"NO_?ANSWER", "", re.sub(r"[*#`]+", "", raw)).strip()
     if not _CITE.search(raw):
         return refusal | {"problems": ["model said it cannot answer from the facts"]}

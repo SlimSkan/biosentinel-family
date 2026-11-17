@@ -242,7 +242,7 @@ def explain(key: str, gene_symbol: str | None, lang: str = "en", level: str = "s
     try:
         text = _clean(_ask_gemma(system, user))
     except Exception as e:  # model not running, timeout, ... -> safe fallback
-        return {"text": base, "source": "template", "problems": [f"ai unavailable: {type(e).__name__}"]}
+        return {"text": base, "source": "template", "problems": [f"ai unavailable: {type(e).__name__}: {str(e)[:140]}"]}
 
     problems = guardrails.check(text, allowed, facts=must, lang=lang, reviewed=base)
     if problems:
