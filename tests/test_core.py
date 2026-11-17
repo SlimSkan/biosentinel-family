@@ -685,3 +685,24 @@ def test_fhir_parser_skips_benign_and_flags_genes_outside_the_panel():
                          f"console.log(JSON.stringify(parseFhir({json.dumps(bundle)}, ['HBB','CFTR'])));"))
     assert r["findings"] == [{"gene": "CFTR", "variant": "", "classification": "Likely pathogenic"}]
     assert r["notCovered"] == ["BRCA1"]
+
+
+def test_gemini_retries_when_busy_then_tries_the_other_gemma_model(monkeypatch):
+    from app import llm
+    monkeypatch.setattr(llm, "GEMINI_KEY", "k")
+    monkeypatch.setattr(llm.time, "sleep", lambda s: None)
+    monkeypatch.delenv("BSF_LLM", raising=False)
+    calls = []
+    class R:
+        def __init__(self, code, data):
+            self.status_code, self._d, self.headers = code, data, {"content-type": "application/json"}
+        def json(self):
+            return self._d
+    def fake_post(url, **kw):
+        calls.append(url.split("/models/")[1].split(":")[0])
+        if len(calls) < 3:
+            return R(503, {"error": {"message": "high demand"}})
+        return R(200, {"candidates": [{"content": {"parts": [{"text": "ok"}]}}]})
+    monkeypatch.setattr(llm.httpx, "post", fake_post)
+    assert llm.ask("s", "u") == "ok"
+    assert calls == ["gemma-4-26b-a4b-it", "gemma-4-26b-a4b-it", "gemma-4-31b-it"]

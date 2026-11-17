@@ -10,6 +10,7 @@ What is sent: only the prompt built by explainer.py / brief.py, which holds de-i
 facts (gene, condition, risk numbers, quiz answers). Never a name, contact or full result.
 """
 import os
+import time
 
 import httpx
 
@@ -17,6 +18,8 @@ OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
 OLLAMA_MODEL = os.environ.get("BSF_MODEL", "gemma4:e4b")
 GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "")
 GEMINI_MODEL = os.environ.get("BSF_GEMINI_MODEL", "gemma-4-26b-a4b-it")
+# Tried in order when Google reports the model busy (503) or rate-limited (429).
+GEMINI_MODELS = [GEMINI_MODEL] + [m for m in ("gemma-4-31b-it", "gemma-4-26b-a4b-it") if m != GEMINI_MODEL]
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models"
 TIMEOUT_S = float(os.environ.get("BSF_LLM_TIMEOUT", "120"))
 
@@ -51,15 +54,24 @@ def ask(system: str, user: str, max_tokens: int = 700) -> str:
 def _gemini(prompt: str, max_tokens: int) -> dict:
     """Gemma 4 on the Gemini API. Gemma takes the instructions inside the user turn.
     Gemma 4 may reason before answering, and that reasoning uses output tokens too, so the
-    budget is generous; the reasoning parts ("thought") are never shown."""
-    r = httpx.post(f"{GEMINI_URL}/{GEMINI_MODEL}:generateContent", timeout=TIMEOUT_S,
-                   headers={"x-goog-api-key": GEMINI_KEY},
-                   json={"contents": [{"role": "user", "parts": [{"text": prompt}]}],
-                         "generationConfig": {"temperature": 0.2, "maxOutputTokens": max(4096, max_tokens * 4)}})
-    if r.status_code >= 400:     # say which error (e.g. 429 = free-tier rate limit); Google's message has no key
-        msg = r.json().get("error", {}).get("message", "") if "json" in r.headers.get("content-type", "") else ""
-        raise RuntimeError(f"Gemini HTTP {r.status_code}: {msg[:120]}")
-    return r.json()
+    budget is generous; the reasoning parts ("thought") are never shown.
+    Google sometimes answers 503 (model busy) or 429 (rate limit): wait briefly and retry,
+    then try the other Gemma 4 model. The last error is raised (callers fall back to reviewed text)."""
+    last = "no model tried"
+    for model in GEMINI_MODELS:
+        for attempt in range(2):
+            r = httpx.post(f"{GEMINI_URL}/{model}:generateContent", timeout=TIMEOUT_S,
+                           headers={"x-goog-api-key": GEMINI_KEY},
+                           json={"contents": [{"role": "user", "parts": [{"text": prompt}]}],
+                                 "generationConfig": {"temperature": 0.2, "maxOutputTokens": max(4096, max_tokens * 4)}})
+            if r.status_code < 400:
+                return r.json()
+            msg = r.json().get("error", {}).get("message", "") if "json" in r.headers.get("content-type", "") else ""
+            last = f"Gemini HTTP {r.status_code} ({model}): {msg[:100]}"     # Google's message never holds the key
+            if r.status_code not in (429, 500, 503):
+                raise RuntimeError(last)
+            time.sleep(1.5 * (attempt + 1))
+    raise RuntimeError(last)
 
 
 def probe() -> dict:
