@@ -11,7 +11,7 @@ C.append(md("""# BioSentinel Family · Gemma 4 live
 
 **Nasab Labs** · Future Health Digital Innovation Challenge, Challenge 03 (Understanding and Reducing Inherited Disease Risk)
 
-The [online demo](https://biosentinel-family.onrender.com) runs on a free server without a GPU, so its AI rewriting is switched off. This notebook runs the **same code** from [GitHub](https://github.com/SlimSkan/biosentinel-family) with **Gemma 4 on Colab's free GPU**, so you can see the AI part working and its safety checks.
+The [online demo](https://biosentinel-family.onrender.com) runs Gemma 4 through Google's Gemini API. This notebook runs the **same code** from [GitHub](https://github.com/SlimSkan/biosentinel-family) with the **open Gemma 4 model on Colab's free GPU**, in your own session, so you can see the AI and its safety checks step by step.
 
 **How to run it (about 8 minutes, mostly downloading Gemma):**
 1. **Runtime → Change runtime type → T4 GPU → Save.**
