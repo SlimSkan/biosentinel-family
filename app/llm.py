@@ -40,8 +40,14 @@ def ask(system: str, user: str, max_tokens: int = 700) -> str:
     (the callers then fall back to reviewed text)."""
     if provider() == "gemini":
         data = _gemini(system + "\n\n" + user, max_tokens)
-        parts = data["candidates"][0].get("content", {}).get("parts", [])
-        return "".join(p.get("text", "") for p in parts if not p.get("thought"))
+        cand = data.get("candidates", [{}])[0]
+        parts = cand.get("content", {}).get("parts", [])
+        text = "".join(p.get("text", "") for p in parts if not p.get("thought"))
+        if not text.strip():      # say why, so the fallback reason is useful
+            kinds = [("thought" if p.get("thought") else "text", len(p.get("text", ""))) for p in parts]
+            raise RuntimeError(f"empty reply (finish={cand.get('finishReason')}, parts={kinds}, "
+                               f"block={data.get('promptFeedback', {}).get('blockReason')})")
+        return text
     r = httpx.post(f"{OLLAMA_URL}/api/chat", timeout=TIMEOUT_S, json={
         "model": OLLAMA_MODEL, "stream": False, "think": False,
         "options": {"temperature": 0.2, "num_predict": max_tokens},
@@ -60,10 +66,15 @@ def _gemini(prompt: str, max_tokens: int) -> dict:
     last = "no model tried"
     for model in GEMINI_MODELS:
         for attempt in range(2):
-            r = httpx.post(f"{GEMINI_URL}/{model}:generateContent", timeout=TIMEOUT_S,
-                           headers={"x-goog-api-key": GEMINI_KEY},
-                           json={"contents": [{"role": "user", "parts": [{"text": prompt}]}],
-                                 "generationConfig": {"temperature": 0.2, "maxOutputTokens": max(4096, max_tokens * 4)}})
+            try:
+                r = httpx.post(f"{GEMINI_URL}/{model}:generateContent", timeout=TIMEOUT_S,
+                               headers={"x-goog-api-key": GEMINI_KEY},
+                               json={"contents": [{"role": "user", "parts": [{"text": prompt}]}],
+                                     "generationConfig": {"temperature": 0.2, "maxOutputTokens": max(4096, max_tokens * 4)}})
+            except httpx.TransportError as e:          # dropped connection: retry like a busy model
+                last = f"{type(e).__name__} ({model})"
+                time.sleep(1.5 * (attempt + 1))
+                continue
             if r.status_code < 400:
                 return r.json()
             msg = r.json().get("error", {}).get("message", "") if "json" in r.headers.get("content-type", "") else ""
