@@ -57,6 +57,9 @@ def ask(system: str, user: str, max_tokens: int = 700) -> str:
     return r.json()["message"]["content"]
 
 
+_THINKING = {"minimal_ok": True}   # set to False if Google rejects thinkingLevel for this model
+
+
 def _gemini(prompt: str, max_tokens: int) -> dict:
     """Gemma 4 on the Gemini API. Gemma takes the instructions inside the user turn.
     Gemma 4 may reason before answering, and that reasoning uses output tokens too, so the
@@ -66,11 +69,15 @@ def _gemini(prompt: str, max_tokens: int) -> dict:
     last = "no model tried"
     for model in GEMINI_MODELS:
         for attempt in range(2):
+            config = {"temperature": 0.2, "maxOutputTokens": max(4096, max_tokens * 4)}
+            if _THINKING["minimal_ok"]:
+                # Gemma 4 otherwise reasons at length and can use the whole budget before answering.
+                config["thinkingConfig"] = {"thinkingLevel": "MINIMAL"}
             try:
                 r = httpx.post(f"{GEMINI_URL}/{model}:generateContent", timeout=TIMEOUT_S,
                                headers={"x-goog-api-key": GEMINI_KEY},
                                json={"contents": [{"role": "user", "parts": [{"text": prompt}]}],
-                                     "generationConfig": {"temperature": 0.2, "maxOutputTokens": max(4096, max_tokens * 4)}})
+                                     "generationConfig": config})
             except httpx.TransportError as e:          # dropped connection: retry like a busy model
                 last = f"{type(e).__name__} ({model})"
                 time.sleep(1.5 * (attempt + 1))
@@ -79,6 +86,9 @@ def _gemini(prompt: str, max_tokens: int) -> dict:
                 return r.json()
             msg = r.json().get("error", {}).get("message", "") if "json" in r.headers.get("content-type", "") else ""
             last = f"Gemini HTTP {r.status_code} ({model}): {msg[:100]}"     # Google's message never holds the key
+            if r.status_code == 400 and "think" in msg.lower() and _THINKING["minimal_ok"]:
+                _THINKING["minimal_ok"] = False        # this model rejects the setting: resend without it
+                continue
             if r.status_code not in (429, 500, 503):
                 raise RuntimeError(last)
             time.sleep(1.5 * (attempt + 1))
