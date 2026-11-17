@@ -36,9 +36,7 @@ def ask(system: str, user: str, max_tokens: int = 700) -> str:
     """Send one prompt, return the model's text. Raises on any network or API error
     (the callers then fall back to reviewed text)."""
     if provider() == "gemini":
-        data = _gemini(f"{system}
-
-{user}", max_tokens)
+        data = _gemini(system + "\n\n" + user, max_tokens)
         parts = data["candidates"][0].get("content", {}).get("parts", [])
         return "".join(p.get("text", "") for p in parts if not p.get("thought"))
     r = httpx.post(f"{OLLAMA_URL}/api/chat", timeout=TIMEOUT_S, json={
