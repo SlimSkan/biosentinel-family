@@ -42,3 +42,20 @@ select { font: inherit; padding: 8px; border: 1px solid var(--line); border-radi
 table.imp { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 14px; }
 table.imp th, table.imp td { text-align: start; padding: 6px 4px; border-bottom: 1px solid var(--line); vertical-align: top; }
 label.btn { cursor: pointer; }
+#ask-q { flex: 1; min-width: 200px; }
+.card.ask { border: 1px dashed var(--line); background: #fff; }
+.answer { margin-top: 8px; padding: 10px; border-radius: 8px; background: #e0eeec; }
+details summary { cursor: pointer; font-size: 13px; color: #555; margin-top: 6px; }
+.opt { display: block; cursor: pointer; position: relative; padding-inline-end: 34px; }
+.opt input { position: absolute; inset-inline-end: 10px; top: 12px; }
+.opt.on { outline: 2px solid var(--accent, #1f6f6b); background: #e0eeec; }
+.cmp-wrap { overflow-x: auto; margin: 10px 0; }
+table.cmp { border-collapse: collapse; width: 100%; font-size: 13px; min-width: 420px; }
+table.cmp th, table.cmp td { border: 1px solid var(--line); padding: 6px; text-align: start; vertical-align: top; }
+table.cmp tr:first-child th { background: #e0eeec; }
+ol.plan { padding-inline-start: 20px; } ol.plan li { margin: 6px 0; }
+.tree-wrap { overflow-x: auto; } svg.tree { width: 100%; min-width: 520px; max-width: 680px; display: block; margin: 6px auto; }
+svg.tree .node { cursor: pointer; } svg.tree .lbl { font-size: 12px; fill: #3a302c; }
+svg.tree .side { font-size: 12px; fill: #7a706a; font-weight: 600; }
+.tree-panel { background: #fff; border: 1px solid var(--line); }
+svg.tree .pct { font-size: 12px; font-weight: 700; fill: #1f6f6b; }

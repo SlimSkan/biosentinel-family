@@ -340,7 +340,9 @@ def test_counsellor_inbox_needs_the_key_when_one_is_set(monkeypatch):
 
 
 def test_health_reports_when_the_ai_is_unreachable(monkeypatch):
-    monkeypatch.setattr(explainer, "OLLAMA_URL", "http://127.0.0.1:9")    # nothing listens here
+    from app import llm
+    monkeypatch.setattr(llm, "GEMINI_KEY", "")
+    monkeypatch.setattr(llm, "OLLAMA_URL", "http://127.0.0.1:9")          # nothing listens here
     h = TestClient(app).get("/api/health").json()
     assert h["ok"] is True and h["ai"]["reachable"] is False
 
@@ -465,3 +467,38 @@ def test_browsers_always_check_for_a_new_version():
     c = TestClient(app)
     for path in ["/", "/partner.html", "/app.js", "/sw.js", "/api/health"]:
         assert c.get(path).headers.get("cache-control") == "no-cache", path
+
+
+# ------------------------------------------------------------------ Gemma 4 through the Gemini API
+class _FakeResponse:
+    def __init__(self, data, code=200):
+        self._data, self.status_code = data, code
+    def json(self):
+        return self._data
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            raise RuntimeError(self.status_code)
+
+
+def test_gemini_provider_sends_the_key_in_a_header_and_skips_thought_parts(monkeypatch):
+    from app import llm
+    monkeypatch.setattr(llm, "GEMINI_KEY", "test-key")
+    monkeypatch.delenv("BSF_LLM", raising=False)
+    seen = {}
+    def fake_post(url, **kw):
+        seen.update(url=url, **kw)
+        return _FakeResponse({"candidates": [{"content": {"parts": [
+            {"text": "thinking...", "thought": True}, {"text": "Hello "}, {"text": "reader."}]}}]})
+    monkeypatch.setattr(llm.httpx, "post", fake_post)
+    assert llm.provider() == "gemini"
+    assert llm.ask("SYSTEM", "USER") == "Hello reader."
+    assert "gemma-4" in seen["url"] and "key=" not in seen["url"]          # key never in the URL
+    assert seen["headers"]["x-goog-api-key"] == "test-key"
+    assert "SYSTEM" in seen["json"]["contents"][0]["parts"][0]["text"]
+
+
+def test_without_a_key_the_app_uses_local_ollama(monkeypatch):
+    from app import llm
+    monkeypatch.setattr(llm, "GEMINI_KEY", "")
+    monkeypatch.delenv("BSF_LLM", raising=False)
+    assert llm.provider() == "ollama"

@@ -24,7 +24,7 @@ from fastapi.staticfiles import StaticFiles
 import httpx
 from pydantic import BaseModel, Field
 
-from . import explainer, knowledge, risk_engine
+from . import explainer, knowledge, llm, risk_engine, tutor
 
 app = FastAPI(title="BioSentinel Family", version="0.2.0")
 WEB = Path(__file__).resolve().parent.parent / "web"
@@ -43,13 +43,8 @@ def health():
 
     Note: on Azure, calling this also wakes the Gemma container if it was scaled to zero.
     """
-    try:
-        r = httpx.get(f"{explainer.OLLAMA_URL}/api/tags", timeout=5)
-        names = [m["name"] for m in r.json().get("models", [])]
-        ai = {"reachable": True, "model_present": explainer.MODEL in names}
-    except Exception as e:
-        ai = {"reachable": False, "error": type(e).__name__}
-    return {"ok": True, "version": app.version, "model": explainer.MODEL, "ai": ai}
+    ai = llm.status()
+    return {"ok": True, "version": app.version, "provider": llm.provider(), "model": llm.model_name(), "ai": ai}
 
 
 # ---------------------------------------------------------------- lab (demo)
@@ -119,6 +114,60 @@ def explain_couple(req: ExplainCouple):
     explanations = [{"gene": r.gene, **explainer.explain(r.explanation_key, r.gene, req.lang, req.level, allowed, req.ai)}
                     for r in risks]
     return {"risks": [r.to_dict() for r in risks], "explanations": explanations}
+
+
+# ---------------------------------------------------------------- family-tree carrier map
+class FamilyMap(BaseModel):
+    gene: str = Field(max_length=12)
+    sex: str = Field("F", pattern="^(F|M)$")
+    tested: dict[str, str] = Field(default_factory=dict, max_length=20)
+
+
+@app.post("/api/family-map")
+def get_family_map(req: FamilyMap):
+    """Each relative's chance of carrying the same change (relationships only, no names)."""
+    if req.gene not in knowledge.kb()["genes"]:
+        raise HTTPException(400, "gene not on panel")
+    return risk_engine.family_map(req.gene, req.tested, req.sex)
+
+
+# ---------------------------------------------------------------- adaptive teaching (live AI)
+class TeachBack(BaseModel):
+    concept: str = Field(pattern="^(carrier|partner|autonomy)$")
+    question: str = Field("", max_length=300)
+    wrong_answer: str = Field("", max_length=200)
+    lang: str = Field("en", pattern="^(en|ar)$")
+    level: str = Field("simple", pattern="^(simple|standard|detailed)$")
+    ai: bool = False
+
+
+@app.post("/api/teachback")
+def teachback(req: TeachBack):
+    """Re-explain one idea the reader got wrong in the quick check, starting from their answer."""
+    if not req.ai:
+        return {"text": tutor.CONCEPTS[req.concept][req.lang], "source": "template", "problems": []}
+    return tutor.reexplain(req.concept, req.wrong_answer, req.question, req.lang, req.level)
+
+
+class Finding(BaseModel):
+    gene: str = Field(max_length=12)
+    classification: str = Field(max_length=40)
+
+
+class Ask(BaseModel):
+    question: str = Field(min_length=3, max_length=300)
+    findings: list[Finding] = Field(default_factory=list, max_length=12)
+    shared: list[str] = Field(default_factory=list, max_length=12)
+    lang: str = Field("en", pattern="^(en|ar)$")
+    level: str = Field("standard", pattern="^(simple|standard|detailed)$")
+
+
+@app.post("/api/ask")
+def ask(req: Ask):
+    """Answer a free question from numbered facts about the reader's own results, with sources.
+    Receives gene names and classifications only: no name, no lab, no contact."""
+    return tutor.answer(req.question, [f.model_dump() for f in req.findings],
+                        [g for g in req.shared if g in knowledge.kb()["genes"]], req.lang, req.level)
 
 
 # ---------------------------------------------------------------- PSI relay

@@ -13,13 +13,9 @@ It never receives a name, the full carrier list, or the partner's result.
 import os
 import re
 
-import httpx
+from . import guardrails, knowledge, llm
 
-from . import guardrails, knowledge
-
-OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
-MODEL = os.environ.get("BSF_MODEL", "gemma4:e4b")
-TIMEOUT_S = float(os.environ.get("BSF_LLM_TIMEOUT", "120"))
+MODEL = llm.OLLAMA_MODEL      # kept for older scripts; llm.model_name() is the live one
 
 # ---------------------------------------------------------------------------
 # 1. Reviewed templates. {gene}, {condition}, {summary} are filled from the KB.
@@ -212,15 +208,7 @@ def _clean(text: str) -> str:
 
 
 def _ask_gemma(system: str, user: str) -> str:
-    r = httpx.post(f"{OLLAMA_URL}/api/chat", timeout=TIMEOUT_S, json={
-        "model": MODEL,
-        "stream": False,
-        "think": False,
-        "options": {"temperature": 0.2, "num_predict": 600},
-        "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
-    })
-    r.raise_for_status()
-    return r.json()["message"]["content"]
+    return llm.ask(system, user, max_tokens=600)
 
 
 def explain(key: str, gene_symbol: str | None, lang: str = "en", level: str = "standard",

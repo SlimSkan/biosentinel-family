@@ -4,6 +4,8 @@
 import { PSI } from "./psi.js";
 import { pdfToText } from "./report_reader.js";
 import { parseReportText } from "./report_parser.js";
+import { renderOptions, renderPlan } from "./options.js";
+import { renderTree } from "./familytree.js";
 
 // ------------------------------------------------------------------ text (EN / AR)
 const T = {
@@ -12,7 +14,11 @@ const T = {
     s4: "4. Our result", s5: "5. Talk to a genetic counsellor",
     levels: { simple: "Simple words", standard: "Standard", detailed: "More detail" },
     hello: (n) => `Hello ${n}. This is your own result. Nobody else can see it.`,
-    lab: "From", rewrite: "Rewrite with Gemma 4", rewriting: "Gemma is writing… (this can take a minute on a laptop)",
+    lab: "From", rewrite: "Rewrite with Gemma 4", rewriting: "Gemma 4 is writing…",
+    askTitle: "Ask a question about my results", askPh: "For example: what does this mean for my children?",
+    askBtn: "Ask Gemma 4", askThinking: "Gemma 4 is thinking…", askSources: "Based on these facts",
+    askNote: "Answers use only facts about your own results, each with its source. Educational information, not a diagnosis. Please do not type names.",
+    quizMissed: "Let's look again at what was unclear:", youAnswered: (a) => `You answered: “${a}”`, rightAnswer: "Right answer",
     srcTemplate: "Reviewed text", srcAi: "Gemma 4 · passed safety checks",
     aiRejected: "Gemma's text did not pass the safety checks, so the reviewed text is shown.",
     escRequired: "Please talk to a genetic counsellor about this result.",
@@ -23,7 +29,7 @@ const T = {
       ["Who decides what to do next?", ["We do, with a counsellor's support if we want", "The app decides", "The doctor decides for us"], 0],
     ],
     check: "Check my answers", quizGood: "All correct. You can continue.",
-    quizSimpler: (n) => `${n} of 3 correct. We switched to simpler explanations above, and here are the right answers:`,
+    quizSimpler: (n) => `${n} of 3 correct. We switched to simpler explanations above.`,
     consent: "I agree to compare privately. Only genes we BOTH carry will be shown, to both of us. Nothing else is revealed.",
     start: "Start and get a code", join: "Join with my partner's code", codePh: "Partner's code",
     shareCode: "Give this code to your partner:", waiting: "Waiting for your partner…",
@@ -87,7 +93,11 @@ const T = {
     s4: "٤. نتيجتنا", s5: "٥. التحدث مع مستشار وراثي",
     levels: { simple: "كلمات بسيطة", standard: "عادي", detailed: "تفاصيل أكثر" },
     hello: (n) => `مرحباً ${n}. هذه نتيجتك الخاصة، ولا يمكن لأحد غيرك رؤيتها.`,
-    lab: "من", rewrite: "إعادة الصياغة بواسطة Gemma 4", rewriting: "يكتب Gemma… (قد يستغرق ذلك دقيقة على الحاسوب)",
+    lab: "من", rewrite: "إعادة الصياغة بواسطة Gemma 4", rewriting: "يكتب Gemma 4…",
+    askTitle: "اطرح سؤالاً عن نتائجي", askPh: "مثلاً: ماذا يعني هذا لأطفالي؟",
+    askBtn: "اسأل Gemma 4", askThinking: "يفكر Gemma 4…", askSources: "استناداً إلى هذه الحقائق",
+    askNote: "تعتمد الإجابات فقط على حقائق عن نتائجك، مع مصدر لكل منها. معلومات تثقيفية وليست تشخيصاً. يرجى عدم كتابة أسماء.",
+    quizMissed: "لنراجع معاً ما لم يكن واضحاً:", youAnswered: (a) => `إجابتك: «${a}»`, rightAnswer: "الإجابة الصحيحة",
     srcTemplate: "نص تمت مراجعته", srcAi: "Gemma 4 · اجتاز فحوص السلامة",
     aiRejected: "لم يجتز نص Gemma فحوص السلامة، لذلك يُعرض النص الذي تمت مراجعته.",
     escRequired: "يرجى التحدث مع مستشار وراثي بشأن هذه النتيجة.",
@@ -98,7 +108,7 @@ const T = {
       ["من يقرر ما سنفعله بعد ذلك؟", ["نحن، بدعم من مستشار إن أردنا", "التطبيق يقرر", "الطبيب يقرر عنا"], 0],
     ],
     check: "تحقق من إجاباتي", quizGood: "كل الإجابات صحيحة. يمكنك المتابعة.",
-    quizSimpler: (n) => `${n} من ٣ إجابات صحيحة. انتقلنا إلى شرح أبسط في الأعلى، وهذه هي الإجابات الصحيحة:`,
+    quizSimpler: (n) => `${n} من ٣ إجابات صحيحة. انتقلنا إلى شرح أبسط في الأعلى.`,
     consent: "أوافق على المقارنة الخاصة. ستُعرض علينا نحن الاثنين فقط الجينات التي نحملها معاً، ولن يُكشف أي شيء آخر.",
     start: "ابدأ واحصل على رمز", join: "انضم برمز شريكي", codePh: "رمز الشريك",
     shareCode: "أعطِ هذا الرمز لشريكك:", waiting: "بانتظار شريكك…",
@@ -167,6 +177,10 @@ const S = {
   person: null,          // the lab report
   findings: [],          // per-gene explanations from the server
   quizScore: null,
+  missed: [],
+  opts: { picks: [] },   // options the couple chose to compare (reviewed, unranked)
+  plan: {},              // next-steps checklist state
+  tree: {},              // family carrier map: {gene, tested, sel}; relationships only, no names            // ideas the reader got wrong in the quick check (for the counsellor brief)
   shared: null,          // genes both partners carry (after PSI)
   couple: null,          // risk engine output for the couple
   invites: {},           // gene -> {id, owner, opened, next_step}; owner secret stays on this phone
@@ -208,8 +222,30 @@ function renderFindings() {
       ${f.finding.escalation === "required" ? `<div class="flag">${t().escRequired}</div>` : ""}
       ${f.finding.escalation === "recommended" ? `<div class="flag">${t().escRecommended}</div>` : ""}
     </div>`).join("");
-  $("cards").innerHTML = cards;
+  $("cards").innerHTML = cards + (S.ai ? `<div class="card ask">
+      <h3>${t().askTitle}</h3>
+      <div class="row"><input type="text" id="ask-q" maxlength="300" placeholder="${esc(t().askPh)}">
+        <button id="ask-go">${t().askBtn}</button></div>
+      <p class="small">${esc(t().askNote)}</p><div id="ask-out"></div></div>` : "");
   document.querySelectorAll("[data-ai]").forEach((b) => (b.onclick = () => rewriteFinding(+b.dataset.ai, b)));
+  if (S.ai) {
+    const go = async () => {
+      const q = $("ask-q").value.trim();
+      if (q.length < 3) return;
+      $("ask-go").disabled = true;
+      $("ask-out").innerHTML = `<p class="small">${t().askThinking}</p>`;
+      const res = await api("/api/ask", { question: q, lang: S.lang, level: S.level, shared: S.shared || [],
+        findings: S.person.variants.map((v) => ({ gene: v.gene, classification: v.classification })) })
+        .catch(() => ({ text: t().aiRejected, source: "template", problems: ["error"] }));
+      $("ask-out").innerHTML = `<div class="answer"><p><strong>${esc(q)}</strong></p><p>${esc(res.text)}</p>
+        <div class="row">${sourceBadge(res)}</div>
+        ${res.sources?.length ? `<details><summary>${t().askSources}</summary><ul>${res.sources.map((x) =>
+          `<li><span class="meta">${x.id}</span> ${esc(x.text)}</li>`).join("")}</ul></details>` : ""}</div>`;
+      $("ask-go").disabled = false;
+    };
+    $("ask-go").onclick = go;
+    $("ask-q").onkeydown = (e) => { if (e.key === "Enter") go(); };
+  }
 }
 
 async function rewriteFinding(i, btn) {
@@ -231,12 +267,32 @@ function renderQuiz() {
     const answers = t().quizQ.map((_, qi) => document.querySelector(`input[name=q${qi}]:checked`)?.value);
     const score = t().quizQ.filter(([, , right], qi) => +answers[qi] === right).length;
     S.quizScore = score;
+    const CONCEPTS = ["carrier", "partner", "autonomy"];            // one idea per question
+    const wrong = t().quizQ.map((x, qi) => qi).filter((qi) => +answers[qi] !== t().quizQ[qi][2]);
+    S.missed = wrong.map((qi) => CONCEPTS[qi]);
     if (score === 3) {
       $("quiz-out").innerHTML = `<p class="ok">${t().quizGood}</p>`;
     } else {
-      // Teach-back: a wrong answer means OUR explanation failed. Re-explain more simply.
+      // Teach-back: a wrong answer means OUR explanation failed. Re-explain more simply, and
+      // re-explain each missed idea starting from the reader's own answer (Gemma 4, checked).
       S.level = "simple"; $("level").value = "simple"; loadFindings();
-      $("quiz-out").innerHTML = `<p>${esc(t().quizSimpler(score))}</p><ul>${t().quizQ.map(([q, o, r]) => `<li>${esc(q)} <strong>${esc(o[r])}</strong></li>`).join("")}</ul>`;
+      $("quiz-out").innerHTML = `<p>${esc(t().quizSimpler(score))}</p><p><strong>${t().quizMissed}</strong></p>` +
+        wrong.map((qi) => {
+          const [q, o, r] = t().quizQ[qi];
+          const given = answers[qi] === undefined ? "—" : o[+answers[qi]];
+          return `<div class="card"><p><strong>${esc(q)}</strong></p><p class="small">${esc(t().youAnswered(given))} ·
+            ${t().rightAnswer}: <strong>${esc(o[r])}</strong></p><p id="tb-${qi}">${S.ai ? t().askThinking : ""}</p>
+            <div class="row" id="tbb-${qi}"></div></div>`;
+        }).join("");
+      wrong.forEach(async (qi) => {
+        const [q, o] = t().quizQ[qi];
+        const res = await api("/api/teachback", { concept: CONCEPTS[qi], question: q, lang: S.lang, level: "simple",
+          wrong_answer: answers[qi] === undefined ? "no answer" : o[+answers[qi]], ai: S.ai })
+          .catch(() => null);
+        if (!res || !$(`tb-${qi}`)) return;
+        $(`tb-${qi}`).textContent = res.text;
+        $(`tbb-${qi}`).innerHTML = sourceBadge(res);
+      });
     }
     unlock("s-match"); renderMatch();
     unlock("s-family"); renderFamily();
@@ -329,10 +385,20 @@ function renderCouple() {
     const r = S.couple.risks.find((x) => x.gene === e.gene);
     return `<div class="card">${r ? `<h3>${esc(e.gene)}</h3>${grid16(r)}` : ""}<p>${esc(e.text)}</p>${sourceBadge(e)}</div>`;
   }).join("");
-  const opts = S.couple.risks.length ? `<p><strong>${t().optionsTitle}</strong></p><div class="options">${
-    t().options.map(([h, d]) => `<div class="card"><h3>${esc(h)}</h3><div class="small">${esc(d)}</div></div>`).join("")}</div>` : "";
-  $("couple").innerHTML = blocks + (S.ai ? `<button class="secondary" id="c-ai">${t().rewrite}</button>` : "") + opts;
+  $("couple").innerHTML = blocks + (S.ai ? `<button class="secondary" id="c-ai">${t().rewrite}</button>` : "") +
+    (S.couple.risks.length ? `<div id="opts"></div>` : "") + `<div id="plan" class="card"></div>`;
   if (S.ai) $("c-ai").onclick = (ev) => { ev.target.disabled = true; ev.target.textContent = t().rewriting; loadCouple(true); };
+  const drawPlan = () => renderPlan($("plan"), S.lang, planInput(), S.plan);
+  if (S.couple.risks.length) renderOptions($("opts"), S.lang, S.opts, () => { drawPlan(); if ($("counsel").innerHTML) renderCounsel(); });
+  drawPlan();
+}
+
+// What the next-steps plan is built from: result types only (no names).
+function planInput() {
+  const own = S.findings.map((f) => ({ gene: f.variant.gene, reason: f.finding.reason }));
+  return { shared: S.shared || [], picks: S.opts.picks,
+           xlFemale: own.filter((f) => f.reason === "xl_carrier_female").map((f) => f.gene),
+           vus: own.filter((f) => f.reason === "vus").map((f) => f.gene) };
 }
 
 // ------------------------------------------------------------------ 5. counsellor hand-off
@@ -395,7 +461,7 @@ const inviteUrl = (id) => `${location.origin}/invite.html?i=${id}`;
 function renderFamily() {
   const eligible = S.findings.filter((f) => ["Pathogenic", "Likely pathogenic"].includes(f.variant.classification));
   if (!eligible.length) { $("family").innerHTML = `<p>${t().famNone}</p>`; return; }
-  $("family").innerHTML = `<p>${esc(t().famIntro)}</p><p class="small">${esc(t().famPrivacy)}</p>` +
+  $("family").innerHTML = `<div id="tree" class="card"></div><p>${esc(t().famIntro)}</p><p class="small">${esc(t().famPrivacy)}</p>` +
     eligible.map((f) => {
       const inv = S.invites[f.variant.gene];
       const body = inv ? `
@@ -410,6 +476,10 @@ function renderFamily() {
       return `<div class="card"><h3>${esc(f.condition)}</h3><div class="meta">${esc(f.variant.gene)}</div>${body}</div>`;
     }).join("") + `<p class="small">${esc(t().famChoice)}</p>`;
   document.querySelectorAll("[data-invite]").forEach((b) => (b.onclick = () => createInvite(b.dataset.invite)));
+  renderTree($("tree"), { lang: S.lang, genes: eligible.map((f) => f.variant.gene), sex: S.person.sex, api, state: S.tree,
+    onInvite: async (gene) => { if (!S.invites[gene]) await createInvite(gene);
+      document.querySelector(`#family input[readonly]`)?.scrollIntoView({ behavior: "smooth", block: "center" }); },
+    onChange: () => { if ($("counsel").innerHTML) renderCounsel(); } }).catch(console.error);
   document.querySelectorAll("[data-copy]").forEach((b) => (b.onclick = async () => {
     await navigator.clipboard?.writeText(inviteUrl(S.invites[b.dataset.copy].id)).catch(() => {});
     b.textContent = t().famCopied;
