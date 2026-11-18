@@ -98,7 +98,11 @@ Strict rules:
 - Never write "you have" and never say the reader has a condition.
 - At most 4 short sentences. Plain text, no markdown, no greetings.
 - In Arabic, use forms that suit any reader.
+- The question may be written in Gulf Arabic or another Arabic dialect, or in Arabic written with Latin letters:
+  understand it, and answer in simple Modern Standard Arabic.
 - Write in {language}. Reading level: {level_guide}."""
+
+_ARABIC = re.compile(r"[\u0600-\u06FF]")
 
 _CITE = re.compile(r"\[F(\d+)\]")
 
@@ -141,6 +145,8 @@ def fact_list(findings: list[dict], shared: list[str], lang: str) -> list[str]:
 
 
 def answer(question: str, findings: list[dict], shared: list[str], lang: str = "en", level: str = "standard") -> dict:
+    if _ARABIC.search(question):        # asked in Arabic (any dialect): answer in Arabic
+        lang = "ar"
     facts = fact_list(findings, shared, lang)
     numbered = "\n".join(f"F{i + 1}: {f}" for i, f in enumerate(facts))
     allowed = {0, 100} | guardrails._percentages(" ".join(facts))

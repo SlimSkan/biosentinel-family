@@ -6,6 +6,8 @@ import { pdfToText } from "./report_reader.js";
 import { parseReportText } from "./report_parser.js";
 import { isFhir, parseFhir } from "./fhir_parser.js";
 import { renderOptions, renderPlan } from "./options.js";
+import { psiItems, readMatch } from "./match_items.js";
+import { renderSimulator } from "./simulator.js";
 import { renderTree, treeSummary } from "./familytree.js";
 import { seal } from "./seal.js";
 import { renderBrief } from "./brief_view.js";
@@ -33,7 +35,16 @@ const T = {
     ],
     check: "Check my answers", quizGood: "All correct. You can continue.",
     quizSimpler: (n) => `${n} of 3 correct. We switched to simpler explanations above.`,
-    consent: "I agree to compare privately. Only genes we BOTH carry will be shown, to both of us. Nothing else is revealed.",
+    consent: "I agree to compare privately. Only genes we BOTH carry, and whether it is the exact same change, will be shown to both of us. Nothing else is revealed.",
+    vusRule: "Uncertain results (VUS) are never used in the match or in any risk figure.",
+    varSame: (g) => `You both carry the identical variant in ${g}. An affected child would have two copies of this same change.`,
+    varDiff: (g) => `You carry different variants in ${g}. The chance is the same, but an affected child would have one of each (compound heterozygous), and how severe the condition is can depend on the combination. A genetic counsellor can explain it. Your exact variant was not shown to your partner.`,
+    varSameShort: "same variant", varDiffShort: "different variants",
+    idTitle: "Identified risk", idSome: (gs) => `From the variants found, in each pregnancy: ${gs}.`,
+    idNone: "No gene in common on this panel: no identified couple risk from the genes tested.",
+    resTitle: "Residual risk",
+    resText: "Screening lowers the chance of an inherited condition but cannot remove it: no panel covers every gene (this demo checks 10; Abu Dhabi's programme covers 570+), some variants cannot be detected, and some are still unknown. A genetic counsellor can explain what remains for you.",
+    affectedWord: "affected",
     start: "Start and get a code", join: "Join with my partner's code", codePh: "Partner's code",
     shareCode: "Give this code to your partner:", waiting: "Waiting for your partner…",
     shareCodeWa: "Send the code by WhatsApp",
@@ -92,6 +103,10 @@ const T = {
     trackTitle: (id, svc) => `Request ${id} · ${svc}`, trackNote: "Encrypted end to end. This page checks for updates while it is open.",
     st: { new: "Sent", seen: "Seen by the counsellor", contacted: "Counsellor is contacting you", appointment_offered: "Appointment offered" },
     eduBanner: "Educational decision support. Not a diagnosis: a certified genetic counsellor confirms what results mean.",
+    incAsked: "Questions I asked Gemma (only the counsellor can read them)", history: "History",
+    withdraw: "Withdraw my request and delete it",
+    withdrawConfirm: "Delete this request from the server? The counsellor will no longer see it.",
+    withdrawn: "Your request was withdrawn and deleted from the server.",
     sent: (id) => `Sent. Case number ${id}. A counsellor will contact you.`,
     recRequired: "We strongly recommend talking with a genetic counsellor.",
     recOptional: "Talking with a counsellor is your choice.",
@@ -127,7 +142,16 @@ const T = {
     ],
     check: "تحقق من إجاباتي", quizGood: "كل الإجابات صحيحة. يمكنك المتابعة.",
     quizSimpler: (n) => `${n} من ٣ إجابات صحيحة. انتقلنا إلى شرح أبسط في الأعلى.`,
-    consent: "أوافق على المقارنة الخاصة. ستُعرض علينا نحن الاثنين فقط الجينات التي نحملها معاً، ولن يُكشف أي شيء آخر.",
+    consent: "أوافق على المقارنة الخاصة. ستُعرض علينا نحن الاثنين فقط الجينات التي نحملها معاً، وما إذا كان التغيّر نفسه تماماً، ولن يُكشف أي شيء آخر.",
+    vusRule: "لا تُستخدم النتائج غير المؤكدة (VUS) أبداً في المقارنة أو في أي رقم للخطر.",
+    varSame: (g) => `تحملان كلاكما المتغيّر نفسه تماماً في ${g}. الطفل المصاب سيحمل نسختين من هذا التغيّر نفسه.`,
+    varDiff: (g) => `تحملان متغيّرين مختلفين في ${g}. الاحتمال هو نفسه، لكن الطفل المصاب سيحمل واحداً من كلٍّ منهما (متغاير الزيجوت المركّب)، وقد تعتمد شدة الحالة على هذا الاجتماع. يمكن لمستشار وراثي أن يشرح ذلك. لم يُعرض متغيّرك الدقيق على شريكك.`,
+    varSameShort: "المتغيّر نفسه", varDiffShort: "متغيّران مختلفان",
+    idTitle: "الخطر المحدَّد", idSome: (gs) => `بناءً على المتغيّرات التي وُجدت، في كل حمل: ${gs}.`,
+    idNone: "لا يوجد جين مشترك ضمن هذه اللوحة: لا خطر محدَّداً على الزوجين من الجينات المفحوصة.",
+    resTitle: "الخطر المتبقي",
+    resText: "يقلل الفحص احتمال الإصابة بحالة وراثية لكنه لا يلغيه: لا تغطي أي لوحة جميع الجينات (يفحص هذا العرض 10 جينات، ويغطي برنامج أبوظبي أكثر من 570)، وبعض المتغيّرات لا يمكن اكتشافها، وبعضها لا يزال غير معروف. يمكن لمستشار وراثي أن يشرح ما يتبقى بالنسبة لكما.",
+    affectedWord: "مصاب",
     start: "ابدأ واحصل على رمز", join: "انضم برمز شريكي", codePh: "رمز الشريك",
     shareCode: "أعطِ هذا الرمز لشريكك:", waiting: "بانتظار شريكك…",
     shareCodeWa: "أرسل الرمز عبر واتساب",
@@ -186,6 +210,10 @@ const T = {
     trackTitle: (id, svc) => `الطلب ${id} · ${svc}`, trackNote: "مشفّر من طرف إلى طرف. تتحقق هذه الصفحة من التحديثات ما دامت مفتوحة.",
     st: { new: "أُرسل", seen: "اطّلع عليه المستشار", contacted: "يتواصل معك المستشار", appointment_offered: "عُرض موعد" },
     eduBanner: "دعم تثقيفي لاتخاذ القرار، وليس تشخيصاً: يؤكد المستشار الوراثي المعتمد معنى النتائج.",
+    incAsked: "الأسئلة التي طرحتها على Gemma (لا يقرؤها إلا المستشار)", history: "السجل",
+    withdraw: "سحب طلبي وحذفه",
+    withdrawConfirm: "هل تريد حذف هذا الطلب من الخادم؟ لن يتمكن المستشار من رؤيته بعد ذلك.",
+    withdrawn: "تم سحب طلبك وحذفه من الخادم.",
     sent: (id) => `تم الإرسال. رقم الحالة ${id}. سيتواصل معك مستشار.`,
     recRequired: "ننصح بشدة بالتحدث مع مستشار وراثي.",
     recOptional: "التحدث مع مستشار هو اختيارك.",
@@ -211,11 +239,13 @@ const S = {
   findings: [],          // per-gene explanations from the server
   quizScore: null,
   missed: [],
+  asked: [],             // questions this person asked Gemma (shared only if they tick the box, encrypted)
   opts: { picks: [] },   // options the couple chose to compare (reviewed, unranked)
   plan: {},              // next-steps checklist state
   services: null,        // counselling services (demo listings)
   referral: null,        // {id, token} of the request sent, to follow its status
-  tree: {},              // family carrier map: {gene, tested, sel}; relationships only, no names            // ideas the reader got wrong in the quick check (for the counsellor brief)
+  tree: {},
+  sim: {},               // simulator state; sim.correct = the independence question answered right              // family carrier map: {gene, tested, sel}; relationships only, no names            // ideas the reader got wrong in the quick check (for the counsellor brief)
   shared: null,          // genes both partners carry (after PSI)
   couple: null,          // risk engine output for the couple
   invites: {},           // gene -> {id, owner, opened, next_step}; owner secret stays on this phone
@@ -230,7 +260,6 @@ const api = async (url, body) => {
   return r.json();
 };
 const unlock = (id) => $(id).classList.remove("locked");
-const pathogenicGenes = () => S.person.variants.filter((v) => v.classification !== "Uncertain significance").map((v) => v.gene);
 
 // ------------------------------------------------------------------ 1. my result
 async function loadFindings() {
@@ -267,6 +296,7 @@ function renderFindings() {
     const go = async () => {
       const q = $("ask-q").value.trim();
       if (q.length < 3) return;
+      if (!S.asked.includes(q)) S.asked = [...S.asked, q].slice(-5);
       $("ask-go").disabled = true;
       $("ask-out").innerHTML = `<p class="small">${t().askThinking}</p>`;
       const res = await api("/api/ask", { question: q, lang: S.lang, level: S.level, shared: S.shared || [],
@@ -336,9 +366,14 @@ function renderQuiz() {
 
 // ------------------------------------------------------------------ 3. private match (PSI)
 function renderMatch() {
-  if (S.shared) { $("match").innerHTML = `<p class="ok">${t().done} ${S.shared.length ? esc(t().sharedSome(S.shared.join(", "))) : t().sharedNone}</p>`; return; }
+  if (S.shared) {
+    const label = (g) => `${g} (${S.sameVariant?.includes(g) ? t().varSameShort : t().varDiffShort})`;
+    $("match").innerHTML = `<p class="ok">${t().done} ${S.shared.length ? esc(t().sharedSome(S.shared.map(label).join(", "))) : t().sharedNone}</p>`;
+    return;
+  }
   $("match").innerHTML = `
     <label><input type="checkbox" id="consent"> ${esc(t().consent)}</label>
+    <p class="small">${esc(t().vusRule)}</p>
     <div class="row"><button id="m-start" disabled>${t().start}</button></div>
     <div class="row" style="margin-top:8px"><input type="text" id="m-code" placeholder="${t().codePh}" style="max-width:180px">
       <button id="m-join" class="secondary" disabled>${t().join}</button></div>
@@ -365,7 +400,7 @@ async function pollUntil(code, ready) {
 // Partner A: Amina (starts)
 async function startMatch() {
   const key = PSI.newKey();                         // secret, never sent
-  const items = PSI.shuffle(pathogenicGenes());
+  const items = PSI.shuffle(psiItems(S.person.variants));   // genes + exact variants; never a VUS
   const { code } = await api("/api/match", {});
   const wa = `https://wa.me/?text=${encodeURIComponent(t().matchMsg(code) + " " + joinUrl(code))}`;
   status(`<p>${t().shareCode}</p><div class="code">${code}</div>
@@ -382,7 +417,7 @@ async function startMatch() {
 async function joinMatch(code) {
   status(`<p>${t().working}</p>`);
   const key = PSI.newKey();
-  const items = PSI.shuffle(pathogenicGenes());
+  const items = PSI.shuffle(psiItems(S.person.variants));
   const s = await pollUntil(code, (s) => s.a_locked);
   const aDouble = PSI.lockValues(s.a_locked, key);                                          // (H(x)^a)^b
   await api(`/api/match/${code}/b1`, { a_double: aDouble, b_locked: await PSI.lockItems(items, key) });
@@ -390,8 +425,10 @@ async function joinMatch(code) {
   finishMatch(PSI.shared(items, s2.b_double, aDouble));
 }
 
-async function finishMatch(shared) {
-  S.shared = shared.sort();
+async function finishMatch(sharedItems) {
+  const m = readMatch(sharedItems);     // genes both carry, and which of them are the identical variant
+  S.shared = m.shared;
+  S.sameVariant = m.sameVariant;
   renderMatch();
   unlock("s-couple");
   await loadCouple();
@@ -401,7 +438,7 @@ async function finishMatch(shared) {
 
 // ------------------------------------------------------------------ 4. our result
 async function loadCouple(ai = false) {
-  S.couple = await api("/api/explain/couple", { shared_genes: S.shared, lang: S.lang, level: S.level, ai });
+  S.couple = await api("/api/explain/couple", { shared_genes: S.shared, same_variant: S.sameVariant || [], lang: S.lang, level: S.level, ai });
   renderCouple();
 }
 
@@ -418,11 +455,21 @@ function renderCouple() {
   if (!S.couple) return;
   const blocks = S.couple.explanations.map((e) => {
     const r = S.couple.risks.find((x) => x.gene === e.gene);
-    return `<div class="card">${r ? `<h3>${esc(e.gene)}</h3>${grid16(r)}` : ""}<p>${esc(e.text)}</p>${sourceBadge(e)}</div>`;
+    const vnote = r && r.variant_match !== "unknown"
+      ? `<p class="vnote">${esc(r.variant_match === "same" ? t().varSame(r.gene) : t().varDiff(r.gene))}</p>` : "";
+    return `<div class="card">${r ? `<h3>${esc(e.gene)}</h3>${grid16(r)}` : ""}<p>${esc(e.text)}</p>${vnote}${sourceBadge(e)}</div>`;
   }).join("");
-  $("couple").innerHTML = blocks + (S.ai ? `<button class="secondary" id="c-ai">${t().rewrite}</button>` : "") +
+  const ident = S.couple.risks.length
+    ? t().idSome(S.couple.risks.map((r) => `${r.gene} ${r.affected_pct}% ${t().affectedWord}`).join("; ")) : t().idNone;
+  const riskPair = `<div class="riskpair"><div class="card"><h3>${t().idTitle}</h3><p>${esc(ident)}</p></div>
+    <div class="card"><h3>${t().resTitle}</h3><p class="small">${esc(t().resText)}</p></div></div>`;
+  $("couple").innerHTML = riskPair + blocks + (S.ai ? `<button class="secondary" id="c-ai">${t().rewrite}</button>` : "") +
+    `<div id="sim" class="card"></div>` +
     (S.couple.risks.length ? `<div id="opts"></div>` : "") + `<div id="plan" class="card"></div>`;
   if (S.ai) $("c-ai").onclick = (ev) => { ev.target.disabled = true; ev.target.textContent = t().rewriting; loadCouple(true); };
+  const scenarios = S.couple.risks.map((r) => ({ id: r.gene, gene: r.gene, kind: "AR" })).concat(
+    S.findings.filter((f) => f.finding.reason === "xl_carrier_female").map((f) => ({ id: f.variant.gene, gene: f.variant.gene, kind: "XL" })));
+  renderSimulator($("sim"), { lang: S.lang, scenarios, state: S.sim, onAnswer: (ok) => { S.sim.correct = ok; } });
   const drawPlan = () => renderPlan($("plan"), S.lang, planInput(), S.plan);
   if (S.couple.risks.length) renderOptions($("opts"), S.lang, S.opts, () => { drawPlan(); if ($("counsel").innerHTML) renderCounsel(); });
   drawPlan();
@@ -462,6 +509,7 @@ async function renderCounsel() {
     <label><input type="checkbox" id="sh-quiz" ${S.quizScore === null ? "disabled" : "checked"}> ${t().incQuiz}</label>
     ${S.opts.picks.length ? `<label><input type="checkbox" id="sh-opts" checked> ${t().incOpts}</label>` : ""}
     ${fam ? `<label><input type="checkbox" id="sh-fam" checked> ${t().incFamily}: ${esc(fam)}</label>` : ""}
+    ${S.asked.length ? `<label><input type="checkbox" id="sh-asked"> ${t().incAsked}: ${esc(S.asked.join(" · "))}</label>` : ""}
     <label>${t().contact}<input type="text" id="sh-contact" maxlength="120"></label>
     <label>${t().note}<input type="text" id="sh-note" maxlength="500"></label>
     <p class="small">${esc(t().privateFields)}</p>
@@ -472,9 +520,10 @@ async function renderCounsel() {
   const input = () => {
     const on = (id) => $(id)?.checked;
     return {
-      shared_genes: on("sh-shared") ? S.shared : [],
+      shared_genes: on("sh-shared") ? S.shared : [], same_variant: on("sh-shared") ? (S.sameVariant || []) : [],
       findings: on("sh-mine") ? mine.map((f) => ({ gene: f.variant.gene, classification: f.variant.classification, reason: f.finding.reason })) : [],
       quiz_score: on("sh-quiz") ? S.quizScore : null, missed: on("sh-quiz") ? S.missed : [],
+      sim_check: on("sh-quiz") && S.sim.correct !== undefined ? (S.sim.correct ? "correct" : "wrong") : "",
       feeling: document.querySelector("input[name=feel]:checked")?.value || "",
       picks: on("sh-opts") ? S.opts.picks : [], family: on("sh-fam") && fam ? [fam] : [],
       pregnant: document.querySelector("input[name=preg]:checked")?.value || "", language: S.lang,
@@ -489,7 +538,7 @@ async function renderCounsel() {
     $("sh-prep").disabled = false;
     if (!brief) { $("sh-preview").innerHTML = `<p class="flag">${t().impError}</p>`; return; }
     $("sh-preview").innerHTML = `<p><strong>${t().briefTitle}</strong></p><p class="small">${esc(t().briefNote)}</p>
-      <div class="card">${renderBrief(brief, { contact: $("sh-contact").value, note: $("sh-note").value })}</div>
+      <div class="card">${renderBrief(brief, { contact: $("sh-contact").value, note: $("sh-note").value, questions: $("sh-asked")?.checked ? S.asked : [] })}</div>
       <button id="sh-send">${t().sendSealed}</button>`;
     $("sh-send").onclick = async () => {
       $("sh-send").disabled = true; $("sh-send").textContent = t().sealing;
@@ -499,7 +548,9 @@ async function renderCounsel() {
         $("sh-send").disabled = false; $("sh-send").textContent = t().sendSealed; return;
       }
       // Sealed on this phone: brief + contact + message. The server receives ciphertext only.
-      const sealed = await seal({ brief, contact: $("sh-contact").value, note: $("sh-note").value }, devices);
+      // The questions go only inside the sealed part: the server and the AI never see them.
+      const sealed = await seal({ brief, contact: $("sh-contact").value, note: $("sh-note").value,
+                                  questions: $("sh-asked")?.checked ? S.asked : [] }, devices);
       const service = document.querySelector("input[name=svc]:checked")?.value || "clinic";
       const res = await api("/api/cases", { service, priority: brief.priority, sealed });
       S.referral = { id: res.id, token: res.token };
@@ -518,7 +569,16 @@ async function renderTracking() {
   $("counsel").innerHTML = `<div class="card"><p><strong>${esc(t().trackTitle(r.id, r.service))}</strong>
       ${r.priority === "urgent" ? `<span class="badge urgent">!</span>` : ""}</p>
     <ol class="track">${order.map((k, i) => `<li class="${i <= at ? "done" : ""}">${t().st[k]}</li>`).join("")}</ol>
-    <p class="small">${esc(t().trackNote)}</p></div>`;
+    <p class="small">${esc(t().trackNote)}</p>
+    <details><summary>${t().history}</summary><ul>${(r.events || []).map((e) =>
+      `<li><span class="meta">${esc(e.at)}</span> ${esc(t().st[e.what] || e.what)}</li>`).join("")}</ul></details>
+    <button class="secondary" id="withdraw">${t().withdraw}</button></div>`;
+  $("withdraw").onclick = async () => {
+    if (!confirm(t().withdrawConfirm)) return;
+    await fetch(`/api/cases/${S.referral.id}`, { method: "DELETE", headers: { "X-Case-Token": S.referral.token } });
+    S.referral = null; clearTimeout(S._track);
+    $("counsel").innerHTML = `<p class="ok">${esc(t().withdrawn)}</p>`;
+  };
   clearTimeout(S._track);
   S._track = setTimeout(() => { if (S.referral) renderTracking(); }, 4000);
 }

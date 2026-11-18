@@ -40,12 +40,16 @@ def build(data: dict) -> dict:
     findings = [f for f in data.get("findings", []) if f.get("gene") in knowledge.kb()["genes"]]
     facts, reasons, risks, agenda = [], [], [], []
 
-    couple = risk_engine.couple_risk(shared)
+    couple = risk_engine.couple_risk(shared, data.get("same_variant"))
     for r in couple:
         g = knowledge.gene(r.gene)
         d = r.to_dict()
         line = (f"Both partners carry a pathogenic change in {r.gene} ({g['condition']['en']}, autosomal recessive): "
                 f"each pregnancy {d['affected_pct']}% affected, {d['carrier_pct']}% carrier, {d['unaffected_pct']}% neither.")
+        line += {"same": " Both carry the identical variant (an affected child would be homozygous).",
+                 "different": " They carry different variants in this gene (an affected child would be compound "
+                              "heterozygous; severity can depend on the combination).",
+                 "unknown": ""}[r.variant_match]
         reasons.append(f"Shared carrier status: {r.gene}")
         risks.append(line)
         facts.append(line)
@@ -64,14 +68,23 @@ def build(data: dict) -> dict:
             reasons.append(f"Uncertain result (VUS): {f['gene']}")
             facts.append(line)
             agenda.append(f"Explain the VUS in {f['gene']} and whether reclassification is expected.")
+    residual = (f"Residual risk remains: the {len(knowledge.kb()['genes'])}-gene panel does not cover every gene "
+                "or detect every variant; a negative result lowers but does not remove risk.")
     if not reasons:
         reasons.append("Questions about screening results")
         facts.append("No shared carrier gene and no escalated finding on this 10-gene panel.")
 
+    facts.append(residual)
     q = data.get("quiz_score")
     missed = [CONCEPT_LABEL[c] for c in data.get("missed", []) if c in CONCEPT_LABEL]
     understanding = ("Quick check not shared." if q is None else
                      f"Quick check: {q} of 3 correct." + (f" Needed re-explanation of {', '.join(missed)}." if missed else ""))
+    sim = data.get("sim_check", "")
+    if sim:
+        understanding += (" Simulator check: understood that each pregnancy keeps the same chance." if sim == "correct"
+                          else " Simulator check: thought a previous affected child changes the next pregnancy's chance.")
+        if sim == "wrong":
+            agenda.append("Re-explain that each pregnancy is independent (25% each time).")
     facts.append(understanding)
     if missed:
         agenda.append("Check understanding of: " + ", ".join(missed) + ".")
@@ -101,7 +114,7 @@ def build(data: dict) -> dict:
         source = "rules"
     return {
         "priority": priority,
-        "reasons": reasons, "risks": risks, "understanding": understanding,
+        "reasons": reasons, "risks": risks, "residual": residual, "understanding": understanding,
         "picks": picks, "feeling": feeling or "", "family": family, "agenda": agenda,
         "facts": [{"id": f"F{i + 1}", "text": t} for i, t in enumerate(facts)],
         "summary": summary, "summary_source": source, "summary_sources": sources,

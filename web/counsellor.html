@@ -51,15 +51,30 @@
     // This browser's counsellor device: the private key stays here (localStorage), the public key is registered.
     async function setupDevice() {
       const saved = store.get("bsf-counsellor-device");
-      device = saved ? JSON.parse(saved) : await newDevice();
+      device = saved ? JSON.parse(saved) : await newDevice();      // empty string after a revoke -> new device
       store.set("bsf-counsellor-device", JSON.stringify(device));
       await authed("/api/counsellor/devices", { method: "POST", body: JSON.stringify({ kid: device.kid, jwk: device.publicJwk }) });
-      document.getElementById("device").innerHTML = `<strong>This device is registered.</strong>
-        <span class="small">Device key ${esc(device.kid)} · ECDH P-256. New cases are sealed for it.</span>`;
+      await showDevices();
     }
 
+    // Registered counsellor devices; one can be revoked (lost or compromised) so new cases are not sealed for it.
+    async function showDevices() {
+      const devs = await fetch("/api/counsellor/devices").then((r) => r.json());
+      document.getElementById("device").innerHTML = `<strong>This device is registered.</strong>
+        <span class="small">Device key ${esc(device.kid)} · ECDH P-256. New cases are sealed for every device below.</span>
+        <details><summary>Registered counsellor devices (${devs.length})</summary><ul>${devs.map((d) =>
+          `<li><span class="meta">${esc(d.kid)}</span> ${d.kid === device.kid ? "(this device)" : ""} ${esc(d.added || "")}
+           <button class="secondary" onclick="revoke('${d.kid}')">Revoke</button></li>`).join("")}</ul></details>`;
+    }
+    window.revoke = async (kid) => {
+      if (!confirm("Revoke this device? New cases will no longer be encrypted for it.")) return;
+      await authed(`/api/counsellor/devices/${kid}`, { method: "DELETE" });
+      if (kid === device.kid) { store.set("bsf-counsellor-device", ""); location.reload(); return; }
+      showDevices();
+    };
+
     async function setStatus(id, status) {
-      await authed(`/api/cases/${id}/status`, { method: "POST", body: JSON.stringify({ status }) });
+      await authed(`/api/cases/${id}/status`, { method: "POST", body: JSON.stringify({ status }), headers: { "X-Device-Kid": device.kid } });
       load();
     }
     window.setStatus = setStatus;
@@ -76,7 +91,7 @@
         catch { return `<p class="small">Sealed for another counsellor device: it cannot be opened here. (This is end-to-end encryption at work.)</p>`; }
       }
       const d = opened[c.id];
-      return `<span class="badge">Decrypted on this device</span>` + renderBrief(d.brief, { contact: d.contact, note: d.note });
+      return `<span class="badge">Decrypted on this device</span>` + renderBrief(d.brief, { contact: d.contact, note: d.note, questions: d.questions || [] });
     }
 
     async function load() {
@@ -89,6 +104,8 @@
             ${["seen", "contacted", "appointment_offered", "closed"].map((s) =>
               `<button class="secondary" onclick="setStatus(${c.id}, '${s}')" ${c.status === s ? "disabled" : ""}>${STATUS[s]}</button>`).join("")}</div>
           ${await caseBody(c)}
+          <details><summary>Audit trail</summary><ul>${(c.events || []).map((e) =>
+            `<li><span class="meta">${esc(e.at)}</span> ${esc(e.what)} · ${esc(e.by)}</li>`).join("")}</ul></details>
         </div>`));
       document.getElementById("cases").innerHTML = html.join("") || "<p>No cases yet.</p>";
     }

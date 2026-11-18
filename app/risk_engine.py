@@ -29,6 +29,9 @@ class Risk:
     explanation_key: str      # which explanation template applies
     escalation: str           # "required" | "recommended" | "none"
     escalation_reason: str
+    # From the private match: "same" (identical variant), "different" (two different pathogenic
+    # variants in the same gene: compound heterozygous) or "unknown" (gene-level match only).
+    variant_match: str = "unknown"
 
     def to_dict(self) -> dict:
         d = asdict(self)
@@ -63,19 +66,24 @@ def individual_findings(variants: list[dict], sex: str) -> list[dict]:
     return out
 
 
-def couple_risk(shared_genes: list[str]) -> list[Risk]:
+def couple_risk(shared_genes: list[str], same_variant: list[str] | None = None) -> list[Risk]:
     """Risk for each gene in which BOTH partners carry a pathogenic variant.
 
     `shared_genes` is the output of the private matching (PSI) step, so this
-    function never sees either partner's full result.
+    function never sees either partner's full result. `same_variant` (also from the PSI) lists
+    the shared genes where both carry the IDENTICAL variant. For an autosomal recessive gene the
+    chance per pregnancy is 25% either way (one changed copy from each parent); with two different
+    variants the child would be compound heterozygous, and severity can depend on the combination.
+    Only pathogenic / likely pathogenic variants ever reach this point: a VUS is never matched.
     """
     risks = []
     for symbol in sorted(set(shared_genes)):
         g = knowledge.gene(symbol)
         if g["inheritance"] == "AR":
             # Punnett square: carrier x carrier -> 1/4 affected, 1/2 carrier, 1/4 neither.
+            match = "unknown" if same_variant is None else ("same" if symbol in same_variant else "different")
             risks.append(Risk(symbol, "AR", 0.25, 0.50, 0.25, "ar_both_carriers",
-                              "required", "shared_carrier"))
+                              "required", "shared_carrier", match))
         # XL genes are handled per person in individual_findings(): for X-linked
         # conditions the father's carrier status does not create a shared risk
         # in the same way, so they are never "couple" findings here.

@@ -626,7 +626,8 @@ def test_counsellor_devices_and_status_need_the_key(monkeypatch):
     assert c.post("/api/counsellor/devices", json=dev).status_code == 401
     assert c.post("/api/counsellor/devices", json=dev, headers={"X-Counsellor-Key": "k3y"}).status_code == 200
     listed = c.get("/api/counsellor/devices").json()
-    assert {"kid": "00112233aabbccdd", "jwk": {"kty": "EC", "crv": "P-256", "x": "AAA", "y": "BBB"}} in listed
+    mine = next(d for d in listed if d["kid"] == "00112233aabbccdd")
+    assert mine["jwk"] == {"kty": "EC", "crv": "P-256", "x": "AAA", "y": "BBB"}
     assert "SECRET" not in json.dumps(listed)                                     # a private part is never kept
     cid = c.post("/api/cases", json={"note": "x"}).json()["id"]
     assert c.post(f"/api/cases/{cid}/status", json={"status": "seen"}).status_code == 401
@@ -706,3 +707,99 @@ def test_gemini_retries_when_busy_then_tries_the_other_gemma_model(monkeypatch):
     monkeypatch.setattr(llm.httpx, "post", fake_post)
     assert llm.ask("s", "u") == "ok"
     assert calls == ["gemma-4-26b-a4b-it", "gemma-4-26b-a4b-it", "gemma-4-31b-it"]
+
+
+
+# ------------------------------------------------------------------ v0.3.1: variant-level match, residual risk, controls
+def test_psi_items_include_exact_variants_and_never_a_vus():
+    mod = (ROOT / "web" / "match_items.js").as_uri()
+    script = (f"import {{psiItems, readMatch, variantKey}} from '{mod}';"
+              "const amina = psiItems([{gene:'HBB', variant:'c.20A>T (p.Glu7Val, HbS)', classification:'Pathogenic'},"
+              "  {gene:'BTD', variant:'c.1A>G', classification:'Uncertain significance'},"
+              "  {gene:'CFTR', variant:'c.1521_1523del', classification:'Likely benign'}]);"
+              "const same = readMatch(['HBB', 'HBB|c.20A>T']);"
+              "const diff = readMatch(['HBB']);"
+              "console.log(JSON.stringify({amina, same, diff, k: variantKey('c.20A>T (p.Glu7Val)'), ex: variantKey('Exon 7 deletion (1 copy)')}));")
+    r = json.loads(_node(script))
+    assert sorted(r["amina"]) == ["HBB", "HBB|c.20A>T"]                         # no VUS, no benign
+    assert r["same"] == {"shared": ["HBB"], "sameVariant": ["HBB"]}
+    assert r["diff"] == {"shared": ["HBB"], "sameVariant": []}
+    assert r["k"] == "c.20A>T" and r["ex"] == "exon 7 deletion (1 copy)"
+
+
+def test_couple_risk_records_same_or_different_variant_and_keeps_25_percent():
+    same = risk_engine.couple_risk(["HBB"], ["HBB"])[0].to_dict()
+    diff = risk_engine.couple_risk(["HBB"], [])[0].to_dict()
+    old = risk_engine.couple_risk(["HBB"])[0].to_dict()
+    assert (same["variant_match"], diff["variant_match"], old["variant_match"]) == ("same", "different", "unknown")
+    assert same["affected_pct"] == diff["affected_pct"] == 25
+
+
+def test_brief_states_variant_match_residual_risk_and_simulator_check(monkeypatch):
+    from app import brief
+    _fake_llm(monkeypatch, "no citations")
+    b = brief.build({"shared_genes": ["HBB"], "same_variant": [], "quiz_score": 3, "sim_check": "wrong"})
+    assert "compound heterozygous" in b["risks"][0]
+    assert b["residual"].startswith("Residual risk remains") and "does not remove risk" in b["residual"]
+    assert "Simulator check" in b["understanding"] and any("independent" in a for a in b["agenda"])
+
+
+def test_person_can_withdraw_and_the_case_is_deleted():
+    c = TestClient(app)
+    r = c.post("/api/cases", json={"note": "x"}).json()
+    hdr = {"X-Case-Token": r["token"]}
+    assert c.get(f"/api/cases/{r['id']}/status", headers=hdr).json()["events"][0]["what"].startswith("sent")
+    assert c.delete(f"/api/cases/{r['id']}", headers={"X-Case-Token": "nope"}).status_code == 403
+    assert c.delete(f"/api/cases/{r['id']}", headers=hdr).status_code == 200
+    assert c.get(f"/api/cases/{r['id']}/status", headers=hdr).status_code == 404
+
+
+def test_audit_trail_records_the_counsellor_device(monkeypatch):
+    from app import main
+    monkeypatch.setattr(main, "COUNSELLOR_KEY", "")
+    c = TestClient(app)
+    r = c.post("/api/cases", json={"note": "x"}).json()
+    c.post(f"/api/cases/{r['id']}/status", json={"status": "seen"}, headers={"X-Device-Kid": "abcdef0123456789"})
+    case = next(x for x in main.CASES if x["id"] == r["id"])
+    assert case["events"][-1]["what"] == "seen" and "abcdef0123456789" in case["events"][-1]["by"]
+
+
+def test_devices_can_be_revoked_and_keys_can_expire(monkeypatch):
+    from app import main
+    monkeypatch.setattr(main, "COUNSELLOR_KEY", "k")
+    c = TestClient(app)
+    h = {"X-Counsellor-Key": "k"}
+    c.post("/api/counsellor/devices", json={"kid": "ffffeeeeddddcccc", "jwk": {"kty": "EC", "crv": "P-256", "x": "1", "y": "2"}}, headers=h)
+    assert c.delete("/api/counsellor/devices/ffffeeeeddddcccc").status_code == 401
+    assert c.delete("/api/counsellor/devices/ffffeeeeddddcccc", headers=h).status_code == 200
+    assert all(d["kid"] != "ffffeeeeddddcccc" for d in c.get("/api/counsellor/devices").json())
+    monkeypatch.setattr(main, "COUNSELLOR_KEY_EXPIRES", "2000-01-01")
+    assert c.get("/api/cases", headers=h).status_code == 401
+
+
+def test_a_question_in_arabic_is_answered_in_arabic(monkeypatch):
+    from app import tutor
+    _fake_llm(monkeypatch, "NO_ANSWER")
+    r = tutor.answer("شو يعني اني حاملة؟", [{"gene": "HBB", "classification": "Pathogenic"}], [], lang="en")
+    assert "مستشار" in r["text"]
+
+
+def test_simulator_draws_follow_the_mendelian_shares():
+    mod = (ROOT / "web" / "simulator.js").as_uri()
+    script = (f"import {{draw}} from '{mod}'; const n = 20000, c = {{}};"
+              "for (let i = 0; i < n; i++) { const o = draw('AR'); c[o] = (c[o] || 0) + 1; }"
+              "console.log(JSON.stringify(Object.fromEntries(Object.entries(c).map(([k, v]) => [k, v / n]))));")
+    r = json.loads(_node(script))
+    assert abs(r["affected"] - 0.25) < 0.02 and abs(r["carrier"] - 0.5) < 0.02 and abs(r["neither"] - 0.25) < 0.02
+
+
+def test_concordance_benchmark_is_100_percent():
+    if not shutil.which("node"):
+        pytest.skip("node not installed")
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("benchmark", ROOT / "tools" / "benchmark.py")
+    bm = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(bm)
+    res = bm.run()
+    assert res["agree"] == res["couples"] == 100 and res["at_risk"] > 0 and res["overlap_not_flagged"] > 0
+    assert res["family_agree"] == len(res["family"]) and res["sim_ok"]

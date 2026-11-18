@@ -231,7 +231,7 @@ own icon and full screen, without an app store.
 Registers this browser as a counsellor device (public key to the server, private key kept here),
 decrypts each case locally, shows the brief, and sets the status the couple sees.
 
-### `tests/test_core.py` — 145 tests
+### `tests/test_core.py` — 155 tests
 They focus on what must never break: the 25/50/25 numbers, X-linked and VUS handling, every
 template passing the guardrails in both languages, every template covering its own key facts
 for every panel gene, a dropped fact or number being caught (the real fava-bean case), unsafe
@@ -289,6 +289,27 @@ never uploaded; the person confirms, exactly like the PDF route.
    person is pregnant, and a private token to follow the status (sent → seen → contacting →
    appointment offered), which the counsellor updates from the console.
 4. **Educational, not diagnostic:** a banner on every result screen, and on every brief.
+
+---
+
+## 3c. Version 0.3.1: scientific credibility and controls
+
+- **Same gene vs same variant** (`web/match_items.js`): the private match compares genes AND exact
+  variants (`HBB` and `HBB|c.20A>T`) in one PSI. The couple learns whether the shared change is
+  identical; a different variant is never revealed. The chance is 25% either way for an autosomal
+  recessive gene, but with two different variants an affected child is compound heterozygous and
+  severity can depend on the combination, so the app says so and refers to a counsellor.
+- **Clinical safety rule:** a VUS (or anything benign) is never put into the match, so it can never
+  create a couple risk or an alert.
+- **Identified vs residual risk:** the couple screen separates the risk from the variants found from
+  what screening cannot rule out (genes not on the panel, undetectable or unknown variants).
+- **Risk simulator** (`web/simulator.js`): a Punnett square, random pregnancies and a teach-back
+  question on independence ("a first affected child does not change the next 25%").
+- **Controls:** withdraw a referral (deleted from the server), audit trail of every status change
+  with the counsellor device id, device revocation, optional key expiry.
+- **Arabic dialects:** a question in Gulf Arabic (or another dialect) is answered in simple Modern
+  Standard Arabic.
+- **Evidence:** `tools/benchmark.py` → [BENCHMARK.md](BENCHMARK.md); [THREAT_MODEL.md](THREAT_MODEL.md).
 
 ---
 

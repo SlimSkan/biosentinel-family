@@ -26,7 +26,7 @@ from pydantic import BaseModel, Field
 
 from . import brief, explainer, knowledge, llm, risk_engine, tutor
 
-app = FastAPI(title="BioSentinel Family", version="0.3.0")
+app = FastAPI(title="BioSentinel Family", version="0.3.1")
 WEB = Path(__file__).resolve().parent.parent / "web"
 
 MAX_ITEMS = 64          # sanity limit on a PSI list
@@ -34,6 +34,8 @@ SESSION_TTL = 30 * 60   # match sessions expire after 30 minutes
 # On a public deployment, set BSF_COUNSELLOR_KEY so only the counsellor can read the inbox.
 # Unset (local demo): the inbox is open, as before.
 COUNSELLOR_KEY = os.environ.get("BSF_COUNSELLOR_KEY", "")
+# Optional expiry for a demo key (YYYY-MM-DD): after that day the key stops working.
+COUNSELLOR_KEY_EXPIRES = os.environ.get("BSF_COUNSELLOR_KEY_EXPIRES", "")
 
 
 # ---------------------------------------------------------------- health
@@ -98,6 +100,7 @@ def explain_finding(req: ExplainOne):
 
 class ExplainCouple(BaseModel):
     shared_genes: list[str]
+    same_variant: list[str] | None = None     # shared genes where the variant is identical (from the PSI)
     lang: str = Field("en", pattern="^(en|ar)$")
     level: str = Field("standard", pattern="^(simple|standard|detailed)$")
     ai: bool = False
@@ -109,7 +112,7 @@ def explain_couple(req: ExplainCouple):
     for g in req.shared_genes:
         if g not in knowledge.kb()["genes"]:
             raise HTTPException(400, f"gene not on panel: {g}")
-    risks = risk_engine.couple_risk(req.shared_genes)
+    risks = risk_engine.couple_risk(req.shared_genes, req.same_variant)
     if not risks:
         out = explainer.explain("no_shared", None, req.lang, req.level, {0, 100}, req.ai)
         return {"risks": [], "explanations": [{"gene": None, **out}]}
@@ -327,6 +330,13 @@ SERVICES = [   # demo listings: fictional services, clearly labelled
 def _counsellor(key: str):
     if COUNSELLOR_KEY and not secrets.compare_digest(key, COUNSELLOR_KEY):
         raise HTTPException(401, "counsellor key required")
+    if COUNSELLOR_KEY_EXPIRES and time.strftime("%Y-%m-%d") > COUNSELLOR_KEY_EXPIRES:
+        raise HTTPException(401, "counsellor key expired")
+
+
+def _event(case: dict, what: str, by: str):
+    """Audit trail: what happened to a case, when, and by whom (a device id, never a name)."""
+    case.setdefault("events", []).append({"at": time.strftime("%Y-%m-%d %H:%M:%S"), "what": what, "by": by})
 
 
 @app.get("/api/services")
@@ -336,9 +346,11 @@ def list_services():
 
 class BriefIn(BaseModel):
     shared_genes: list[str] = Field(default_factory=list, max_length=12)
+    same_variant: list[str] | None = None
     findings: list[dict] = Field(default_factory=list, max_length=12)
     quiz_score: int | None = None
     missed: list[str] = Field(default_factory=list, max_length=3)
+    sim_check: str = Field("", pattern="^(correct|wrong|)$")
     feeling: str = Field("", max_length=2)
     picks: list[str] = Field(default_factory=list, max_length=6)
     family: list[str] = Field(default_factory=list, max_length=5)
@@ -375,7 +387,18 @@ def register_device(d: Device, x_counsellor_key: str = Header("")):
 @app.get("/api/counsellor/devices")
 def list_devices():
     """Public keys only: anyone may encrypt for the counsellors; only they can decrypt."""
-    return [{"kid": d["kid"], "jwk": d["jwk"]} for d in DEVICES]
+    return [{"kid": d["kid"], "jwk": d["jwk"], "added": d.get("added", "")} for d in DEVICES]
+
+
+@app.delete("/api/counsellor/devices/{kid}")
+def revoke_device(kid: str, x_counsellor_key: str = Header("")):
+    """Revoke a counsellor device (lost or compromised): new cases are no longer sealed for it."""
+    _counsellor(x_counsellor_key)
+    before = len(DEVICES)
+    DEVICES[:] = [d for d in DEVICES if d["kid"] != kid]
+    if len(DEVICES) == before:
+        raise HTTPException(404, "device not found")
+    return {"ok": True, "devices": len(DEVICES)}
 
 
 class Sealed(BaseModel):
@@ -409,6 +432,7 @@ def create_case(case: Case):
     if case.sealed:      # drop the empty plaintext fields: the server keeps ciphertext only
         for k in ("shared_genes", "other_reasons", "quiz_score", "contact", "note"):
             item.pop(k, None)
+    _event(item, "sent" + (" (encrypted)" if case.sealed else ""), "person")
     CASES.append(item)
     return {"id": item["id"], "token": token}
 
@@ -431,13 +455,24 @@ class StatusIn(BaseModel):
 
 
 @app.post("/api/cases/{cid}/status")
-def set_status(cid: int, body: StatusIn, x_counsellor_key: str = Header("")):
+def set_status(cid: int, body: StatusIn, x_counsellor_key: str = Header(""), x_device_kid: str = Header("")):
     _counsellor(x_counsellor_key)
     if body.status not in STATUSES:
         raise HTTPException(400, "unknown status")
     c = _case(cid)
     c["status"], c["updated"] = body.status, time.strftime("%Y-%m-%d %H:%M")
+    _event(c, body.status, f"counsellor device {x_device_kid[:16]}" if x_device_kid else "counsellor")
     return {"ok": True}
+
+
+@app.delete("/api/cases/{cid}")
+def withdraw_case(cid: int, x_case_token: str = Header("")):
+    """The person withdraws consent: the case (ciphertext included) is deleted from the server."""
+    c = _case(cid)
+    if not secrets.compare_digest(x_case_token, c["_token"]):
+        raise HTTPException(403, "wrong token")
+    CASES.remove(c)
+    return {"ok": True, "deleted": cid}
 
 
 @app.get("/api/cases/{cid}/status")
@@ -447,7 +482,8 @@ def case_status(cid: int, x_case_token: str = Header("")):
     if not secrets.compare_digest(x_case_token, c["_token"]):
         raise HTTPException(403, "wrong token")
     svc = next((x["name"] for x in SERVICES if x["id"] == c.get("service")), "")
-    return {"id": cid, "status": c["status"], "updated": c["updated"], "service": svc, "priority": c["priority"]}
+    return {"id": cid, "status": c["status"], "updated": c["updated"], "service": svc, "priority": c["priority"],
+            "events": [{"at": e["at"], "what": e["what"]} for e in c.get("events", [])]}
 
 
 # ---------------------------------------------------------------- web app

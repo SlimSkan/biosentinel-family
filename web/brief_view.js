@@ -7,11 +7,13 @@ const list = (xs) => `<ul>${xs.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>`;
 export function renderBrief(b, extra = {}) {
   const rows = [
     ["Reason for referral", list(b.reasons)],
-    b.risks.length && ["Risk figures (genetics rules)", list(b.risks)],
+    b.risks.length && ["Identified risk (genetics rules)", list(b.risks)],
+    b.residual && ["Residual risk", esc(b.residual)],
     ["Understanding", esc(b.understanding)],
     b.picks.length && ["Wants to discuss", esc(b.picks.join("; "))],
     b.feeling && ["Self-reported feeling", esc(b.feeling)],
     b.family.length && ["Family (relationships only)", list(b.family)],
+    extra.questions?.length && ["Questions they asked the app", list(extra.questions)],
     extra.contact && ["Contact", esc(extra.contact)],
     extra.note && ["Message", esc(extra.note)],
   ].filter(Boolean);
